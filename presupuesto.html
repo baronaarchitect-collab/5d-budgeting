@@ -136,6 +136,7 @@
       </table></div>
       <div class="btnrow" style="margin-top:10px;align-items:center">
         <button class="btn sm" id="apuedit-add"><span class="ic">+</span> Insumo</button>
+        <button class="btn sm ok" id="apuedit-cotizar" title="Mandar a cotizar TODOS los insumos de este APU en un solo mensaje (excluye mano de obra)"><span class="ic">✆</span> Cotizar APU completo</button>
         <span class="hint" style="flex:1">Total del APU: <b id="apuedit-total" style="color:var(--accent);font-size:13px">$0</b></span>
         <button class="btn primary" id="apuedit-save"><span class="ic">☁</span> Guardar como nuevo APU y usarlo</button>
       </div>
@@ -381,8 +382,12 @@
   </div>
   <div class="cols">
     <div class="box">
-      <h3><span class="dot"></span> 1 · Mandar a cotizar a distribuidores especializados</h3>
-      <p class="hint">Genera un borrador de correo por especialidad con la lista y cantidades totales del proyecto. Revísalo en la pestaña Correo y envíalo al distribuidor.</p>
+      <h3><span class="dot"></span> 1 · Mandar a cotizar los materiales</h3>
+      <p class="hint">Cotiza <b>todo el proyecto</b> en un solo mensaje, o por especialidad. Se abre el mensaje listo para enviar por WhatsApp a tus ferreterías, por correo (mailto) o copiarlo. La mano de obra se excluye.</p>
+      <div class="btnrow" style="margin-bottom:8px">
+        <button class="btn ok" id="btn-mat-cotizar-todo"><span class="ic">✆</span> Cotizar TODO el proyecto de materiales</button>
+      </div>
+      <p class="hint" style="margin:2px 0 4px">…o por especialidad (borrador de correo):</p>
       <div class="btnrow" id="btn-esp-row">
         <button class="btn viol btn-esp" data-esp="ACERO"><span class="ic">✉</span> Acero</button>
         <button class="btn viol btn-esp" data-esp="CONCRETO"><span class="ic">✉</span> Concreto</button>
@@ -1637,7 +1642,9 @@ function ferreterias(){
  ];
 }
 function saveFerreterias(list){localStorage.setItem(FERRE_KEY,JSON.stringify(list));}
+let waTitulo='';
 function openWaCotizar(ins){
+ waTitulo=ins.nombre||'Material';
  $('wa-material').innerHTML=`Material: <b style="color:var(--accent)">${ins.nombre}</b> (${ins.unidad||'un'})`;
  const mat=(P.materiales||[]).find(m=>(ins.codigo&&m.codigo===ins.codigo)||m.nombre===ins.nombre);
  const cant=mat?` Cantidad estimada del proyecto: ${(mat.cant||0).toLocaleString('es-CO')} ${mat.unidad||''}.`:'';
@@ -1646,6 +1653,31 @@ function openWaCotizar(ins){
 - ${ins.nombre} — unidad: ${ins.unidad||'un'}.${cant}
 
 ¿Me indican por favor precio unitario (IVA discriminado), disponibilidad y tiempo de entrega? Gracias.`;
+ renderWaBtns();
+ $('modal-wa').classList.add('on');
+}
+/* ---- cotizar una LISTA de insumos (APU completo o todo el proyecto) en un solo mensaje ---- */
+function waLineas(insumos){
+ return insumos.map(x=>{
+  const mat=(P.materiales||[]).find(m=>(x.codigo&&m.codigo===x.codigo)||m.nombre===x.nombre);
+  let cant;
+  if(mat&&mat.cant)cant=`${(mat.cant||0).toLocaleString('es-CO')} ${mat.unidad||x.unidad||''}`.trim();
+  else if(x.cant)cant=`${(x.cant||0).toLocaleString('es-CO')} ${x.unidad||''}`.trim();
+  else cant=`unidad: ${x.unidad||'un'}`;
+  return ` - ${x.nombre} — ${cant}`;
+ }).join('\n');
+}
+function openWaCotizarLista(titulo,insumos){
+ const cotizables=(insumos||[]).filter(x=>x&&x.nombre&&x.tipo!=='MO');
+ if(!cotizables.length){flash('No hay materiales cotizables (se excluye la mano de obra)');return;}
+ waTitulo=titulo;
+ $('wa-material').innerHTML=`Cotización: <b style="color:var(--accent)">${titulo}</b> — ${cotizables.length} materiales en un solo mensaje`;
+ const proj=P.model.proyecto||P.nombre, dir=P.model.direccion||P.model.ciudad||'obra';
+ $('wa-msg').value=`Buen día. Para el proyecto ${proj} (entrega en ${dir}) solicitamos cotización de los siguientes materiales:
+
+${waLineas(cotizables)}
+
+¿Nos indican por favor, para cada ítem, precio unitario (IVA discriminado), disponibilidad y tiempo de entrega? Idealmente respondan en Excel/CSV con columnas material, unidad y precio unitario. Gracias.`;
  renderWaBtns();
  $('modal-wa').classList.add('on');
 }
@@ -1658,6 +1690,16 @@ function renderWaBtns(){
   b.onclick=()=>window.open('https://wa.me/'+f.tel+'?text='+encodeURIComponent($('wa-msg').value),'_blank','noopener');
   wrap.appendChild(b);
  });
+ const mb=document.createElement('button');
+ mb.className='btn sm';
+ mb.innerHTML='<span class="ic">✉</span> Correo (mailto)';
+ mb.onclick=()=>window.open('mailto:?subject='+encodeURIComponent('Solicitud de cotización — '+(waTitulo||P.model.proyecto||P.nombre))+'&body='+encodeURIComponent($('wa-msg').value),'_blank');
+ wrap.appendChild(mb);
+ const cb=document.createElement('button');
+ cb.className='btn sm';
+ cb.innerHTML='<span class="ic">⧉</span> Copiar lista';
+ cb.onclick=async()=>{try{await navigator.clipboard.writeText($('wa-msg').value);flash('Lista de cotización copiada al portapapeles');}catch(e){flash('No se pudo copiar automáticamente — selecciona y copia el texto');}};
+ wrap.appendChild(cb);
 }
 $('wa-x').onclick=()=>$('modal-wa').classList.remove('on');
 $('modal-wa').onclick=e=>{if(e.target.id==='modal-wa')$('modal-wa').classList.remove('on');};
@@ -1715,6 +1757,7 @@ function renderApuEdit(){
  $('apuedit-total').textContent=fmt(apuEditTotal());
 }
 $('apuedit-add').onclick=()=>{APUEDIT.insumos.push({codigo:'',nombre:'',tipo:'MAT',unidad:'un',rendimiento:1,desperdicio:0,precio_unitario:0});APUEDIT.dirty=true;renderApuEdit();};
+$('apuedit-cotizar').onclick=()=>openWaCotizarLista($('apuedit-nombre').value.trim()||'APU',APUEDIT.insumos);
 async function saveApuEdit(){
  if(!cfUrl()){$('apuedit-out').innerHTML='<b style="color:var(--accent-2)">Configura la URL de Cloudflare (botón ☁) para guardar el nuevo APU.</b>';return null;}
  const body={nombre:$('apuedit-nombre').value.trim(),unidad:$('apuedit-unidad').value.trim(),
@@ -1879,6 +1922,10 @@ function renderMat(){
   <div class="stat"><span class="lbl">Proveedores</span><span class="val new">${provs.length}/3</span></div>`;
 }
 $('btn-mat-calc').onclick=calcMateriales;
+$('btn-mat-cotizar-todo').onclick=()=>{
+ if(!P.materiales||!P.materiales.length){flash('Primero pulsa «Calcular materiales totales»');return;}
+ openWaCotizarLista('Todos los materiales — '+(P.model.proyecto||P.nombre),P.materiales);
+};
 $('mat-filtro').onchange=()=>{$('mat-esp-wrap').style.display=$('mat-filtro').value==='ESP'?'':'none';renderMat();};
 $('mat-esp').onchange=renderMat;
 
