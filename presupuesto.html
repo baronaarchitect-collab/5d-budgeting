@@ -27,6 +27,11 @@
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
   @media (max-width:900px){.cols{grid-template-columns:1fr}}
   .box{background:var(--bg-1);border:1px solid var(--line);padding:14px;display:flex;flex-direction:column;gap:10px}
+  .subtabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:4px}
+  .subtab{padding:7px 13px;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--text-dim);cursor:pointer;font-family:var(--mono);font-size:11px;display:flex;align-items:center;gap:6px}
+  .subtab.on{background:var(--bg-1);border-color:var(--line);color:var(--accent);font-weight:600;margin-bottom:-1px}
+  .subpanel{display:none;flex-direction:column;gap:16px}
+  .subpanel.on{display:flex}
   .box h3{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);display:flex;align-items:center;gap:8px}
   .box h3 .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
   .btn{padding:9px 12px;background:var(--bg-2);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:11px;cursor:pointer;text-align:left;display:inline-flex;align-items:center;gap:8px;transition:all .15s}
@@ -101,6 +106,7 @@
   <button class="tabbtn" data-tab="presupuesto"><span class="ic">$</span> Presupuesto</button>
   <button class="tabbtn" data-tab="cronograma" style="display:none"><span class="ic">▦</span> Cronograma</button>
   <button class="tabbtn" data-tab="materiales"><span class="ic">▤</span> Materiales</button>
+  <button class="tabbtn" data-tab="proveedores"><span class="ic">☎</span> Proveedores</button>
   <button class="tabbtn" data-tab="documentos" style="display:none"><span class="ic">✓</span> Documentos <span id="docs-badge" class="pill falta">0%</span></button>
   <button class="tabbtn" data-tab="aseguradoras" style="display:none"><span class="ic">⛨</span> Aseguradoras</button>
   <button class="tabbtn" data-tab="correo" style="display:none"><span class="ic">✉</span> Correo</button>
@@ -286,6 +292,11 @@
 <!-- ============ PRESUPUESTO ============ -->
 <section class="panel" id="panel-presupuesto">
   <div class="grid4" id="pres-stats"></div>
+  <div class="subtabs">
+    <button class="subtab on" data-sub="apu"><span class="ic">$</span> APU y actividades</button>
+    <button class="subtab" data-sub="prov"><span class="ic">☎</span> Cotizaciones de proveedores y total</button>
+  </div>
+  <div class="subpanel on" id="sub-apu">
   <div class="box">
     <h3><span class="dot"></span> Actividades del IFC (parámetros PSI) × Base APU Gobernación</h3>
     <div class="btnrow">
@@ -331,6 +342,39 @@
     </table></div>
     <p class="hint">Estos capítulos son obligatorios en el desglose que pide la aseguradora para el decenal. En TRC alimentan el presupuesto total / límite asegurado.</p>
   </div>
+  </div><!-- /sub-apu -->
+
+  <div class="subpanel" id="sub-prov">
+    <div class="box">
+      <h3><span class="dot"></span> Proveedores de cotización — agrega, sube su cotización o quítalo</h3>
+      <div class="btnrow" style="align-items:flex-end;flex-wrap:wrap">
+        <div class="ctl" style="min-width:220px;flex:1"><label>Agregar proveedor a comparar</label>
+          <select id="prov-add-sel" class="inp"></select>
+        </div>
+        <button class="btn sm primary" id="prov-add-btn" style="align-self:flex-end"><span class="ic">+</span> Agregar</button>
+        <button class="btn sm" id="prov-recalc" style="align-self:flex-end"><span class="ic">Σ</span> Calcular / actualizar materiales</button>
+      </div>
+      <p class="hint">Los proveedores salen de la pestaña <b>Proveedores</b> (nombre + WhatsApp). Agrégalos aquí para comparar, sube la cotización de cada uno (Excel/CSV con material y precio unitario) y quítalos cuando quieras. El total usa siempre el <b>precio más económico</b> por material entre la base APU y los proveedores.</p>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-prov-activos">
+        <thead><tr><th style="width:30%">Proveedor</th><th>WhatsApp</th><th>Materiales cotizados</th><th style="width:230px">Cotización</th><th style="width:80px"></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+    <div class="box">
+      <h3><span class="dot"></span> Comparativo por material (verde = más económico)</h3>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-prov-comp"><thead></thead><tbody></tbody></table></div>
+    </div>
+    <div class="box">
+      <h3><span class="dot"></span> Total presupuesto — APU vs. mejor precio de proveedores</h3>
+      <div class="grid4" id="prov-tot-stats"></div>
+      <div class="btnrow">
+        <button class="btn ok" id="btn-prov-xls"><span class="ic">⇓</span> Excel comparativo por proveedor</button>
+        <button class="btn viol" id="btn-cf-push2"><span class="ic">☁</span> Actualizar precios en Cloudflare</button>
+      </div>
+      <p class="hint" id="prov-tot-hint">El <b>Total final</b> toma el costo directo del APU y le descuenta el ahorro de comprar cada material al proveedor más económico. Los indirectos se suman igual.</p>
+    </div>
+    <input type="file" id="file-quote2" accept=".xlsx,.xls,.csv" style="display:none">
+  </div><!-- /sub-prov -->
 </section>
 
 <!-- ============ CRONOGRAMA ============ -->
@@ -409,6 +453,23 @@
       <button class="btn ok" id="btn-cf-push"><span class="ic">☁</span> Actualizar precios en Cloudflare</button>
       <p class="hint" id="cf-push-out"></p>
     </div>
+  </div>
+</section>
+
+<!-- ============ PROVEEDORES (directorio nombre + WhatsApp) ============ -->
+<section class="panel" id="panel-proveedores">
+  <div class="box">
+    <h3><span class="dot"></span> Directorio de proveedores — nombre y WhatsApp para cotizar</h3>
+    <div class="btnrow" style="align-items:flex-end;flex-wrap:wrap">
+      <div class="ctl" style="min-width:200px"><label>Nombre / ferretería</label><input id="prov-dir-nombre" class="inp" placeholder="Ej: Ferretería El Ingenio"></div>
+      <div class="ctl" style="min-width:180px"><label>WhatsApp</label><input id="prov-dir-tel" class="inp" placeholder="3001234567 o 573001234567"></div>
+      <button class="btn sm primary" id="prov-dir-add" style="align-self:flex-end"><span class="ic">+</span> Agregar proveedor</button>
+    </div>
+    <div style="overflow-x:auto"><table class="tbl" id="tbl-prov-dir">
+      <thead><tr><th style="width:38%">Proveedor</th><th>WhatsApp</th><th style="width:120px">Cotizar</th><th style="width:80px"></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="hint">Estos proveedores se usan en los botones de cotización por WhatsApp (en APU, materiales y en el comparativo de Presupuesto) y en la lista de proveedores a comparar. Se guardan en este navegador y quedan disponibles en todos los proyectos.</p>
   </div>
 </section>
 
@@ -595,6 +656,14 @@ document.querySelectorAll('.tabbtn[data-tab]').forEach(b=>b.onclick=()=>{
  if(b.dataset.tab==='cronograma')renderCron();
  if(b.dataset.tab==='correo'){if(mailCustom)mailCustom=false;else regenMail();}
  if(b.dataset.tab==='materiales')renderMat();
+ if(b.dataset.tab==='proveedores')renderProvDir();
+ if(b.dataset.tab==='presupuesto')renderProvSub();
+});
+/* ---- sub-pestañas dentro de Presupuesto ---- */
+document.querySelectorAll('.subtab[data-sub]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.subtab[data-sub]').forEach(x=>x.classList.toggle('on',x===b));
+ document.querySelectorAll('#panel-presupuesto .subpanel').forEach(p=>p.classList.toggle('on',p.id==='sub-'+b.dataset.sub));
+ if(b.dataset.sub==='prov')renderProvSub();
 });
 
 /* ================= MODELO: IFC ================= */
@@ -1961,13 +2030,8 @@ function overlapWords(a,b){
  let c=0;for(const w of A)if(B.has(w))c++;
  return c/Math.min(A.size,B.size);
 }
-$('file-quote').onchange=e=>{
- const f=e.target.files[0]; if(!f)return;
- const prov=($('quote-prov').value||'').trim().slice(0,60);
- if(!prov){flash('Escribe el nombre del proveedor antes de subir la cotización');e.target.value='';return;}
- if(!P.materiales.length){flash('Calcula primero los materiales totales');e.target.value='';return;}
- const provs=provList();
- if(!provs.includes(prov)&&provs.length>=3){flash('Ya hay 3 proveedores — repite un nombre existente para actualizarlo');e.target.value='';return;}
+/* parser compartido: empareja el archivo del proveedor con los materiales del proyecto */
+function parseQuoteFile(f,prov,cb){
  const r=new FileReader();
  r.onload=()=>{
   try{
@@ -1990,32 +2054,187 @@ $('file-quote').onchange=e=>{
       ||P.materiales.find(m=>{const mn=normTxt(m.nombre);return mn===nn||mn.includes(nn)||nn.includes(mn)||overlapWords(mn,nn)>=0.6;});
     if(hit){(P.preciosProveedores[hit.codigo]=P.preciosProveedores[hit.codigo]||{})[prov]=precio;matched++;}
    }
-   renderMat();autosave();
-   $('quote-out').innerHTML=matched
-    ?`<b style="color:var(--ok)">✓ ${matched} materiales emparejados con los precios de «${prov}»</b> — el más económico queda en verde.`
-    :`<b style="color:var(--accent-2)">No se emparejó ningún material.</b> El archivo debe tener el nombre del material y su precio unitario por fila.`;
+   autosave();
+   cb&&cb(matched);
   }catch(err){flash('Error leyendo la cotización: '+err.message);}
  };
- r.readAsBinaryString(f); e.target.value='';
+ r.readAsBinaryString(f);
+}
+$('file-quote').onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const prov=($('quote-prov').value||'').trim().slice(0,60);
+ if(!prov){flash('Escribe el nombre del proveedor antes de subir la cotización');e.target.value='';return;}
+ if(!P.materiales.length){flash('Calcula primero los materiales totales');e.target.value='';return;}
+ const provs=provList();
+ if(!provs.includes(prov)&&provs.length>=3){flash('Ya hay 3 proveedores — repite un nombre existente para actualizarlo');e.target.value='';return;}
+ parseQuoteFile(f,prov,matched=>{
+  renderMat();
+  $('quote-out').innerHTML=matched
+   ?`<b style="color:var(--ok)">✓ ${matched} materiales emparejados con los precios de «${prov}»</b> — el más económico queda en verde.`
+   :`<b style="color:var(--accent-2)">No se emparejó ningún material.</b> El archivo debe tener el nombre del material y su precio unitario por fila.`;
+ });
+ e.target.value='';
 };
 
 /* ---- actualizar precios en Cloudflare ---- */
-$('btn-cf-push').onclick=async()=>{
- if(!cfUrl()){$('cf-push-out').innerHTML='<b style="color:var(--accent-2)">Configura primero la URL de Cloudflare</b> (botón ☁ en Presupuesto).';return;}
+async function pushPreciosCF(outId){
+ const out=$(outId);
+ if(!cfUrl()){out.innerHTML='<b style="color:var(--accent-2)">Configura primero la URL de Cloudflare</b> (botón ☁ en la sub-pestaña APU).';return;}
  const body=[];
  for(const cod in P.preciosProveedores)for(const prov in P.preciosProveedores[cod]){
   const mat=P.materiales.find(m=>m.codigo===cod);
   body.push({insumo_codigo:cod,proveedor:prov,precio:P.preciosProveedores[cod][prov],unidad:mat?mat.unidad:null});
  }
- if(!body.length){$('cf-push-out').textContent='No hay precios de proveedores para subir — sube primero una cotización.';return;}
- $('cf-push-out').textContent='Subiendo '+body.length+' precios…';
+ if(!body.length){out.textContent='No hay precios de proveedores para subir — sube primero una cotización.';return;}
+ out.textContent='Subiendo '+body.length+' precios…';
  try{
   const r=await fetch(cfUrl()+'/api/precios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d=await r.json();
-  $('cf-push-out').innerHTML=d.ok
+  out.innerHTML=d.ok
    ?`<b style="color:var(--ok)">✓ ${d.actualizados} precios actualizados en Cloudflare D1 (${d.fecha})</b>`
    :'<b style="color:var(--accent-2)">Error: '+(d.error||r.status)+'</b>';
- }catch(err){$('cf-push-out').textContent='Error de red: '+err.message;}
+ }catch(err){out.textContent='Error de red: '+err.message;}
+}
+$('btn-cf-push').onclick=()=>pushPreciosCF('cf-push-out');
+
+/* ================= DIRECTORIO DE PROVEEDORES (pestaña) ================= */
+function telNorm(t){t=String(t||'').replace(/\D/g,'');if(t.length===10)t='57'+t;return t;}
+function renderProvDir(){
+ const tbl=$('tbl-prov-dir'); if(!tbl)return;
+ const tb=tbl.querySelector('tbody'); tb.innerHTML='';
+ const list=ferreterias();
+ if(!localStorage.getItem(FERRE_KEY))saveFerreterias(list);
+ if(!list.length){tb.innerHTML='<tr><td colspan="4" class="hint" style="font-style:italic;padding:10px">Sin proveedores — agrega el primero arriba.</td></tr>';return;}
+ list.forEach((f,i)=>{
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td><input value="${(f.nombre||'').replace(/"/g,'&quot;')}"></td>
+   <td><input value="${(f.tel||'').replace(/"/g,'&quot;')}"></td>
+   <td style="text-align:center"><button class="btn sm viol prov-wa">✆ Probar</button></td>
+   <td style="text-align:center"><span class="prov-del" title="Quitar" style="cursor:pointer;color:var(--accent-2);font-weight:700">✕</span></td>`;
+  const [iN,iT]=tr.querySelectorAll('input');
+  iN.oninput=()=>{const l=ferreterias();l[i].nombre=iN.value;saveFerreterias(l);};
+  iT.onchange=()=>{const l=ferreterias();l[i].tel=telNorm(iT.value);saveFerreterias(l);iT.value=l[i].tel;};
+  tr.querySelector('.prov-wa').onclick=()=>{const t=telNorm(f.tel);if(!t){flash('Falta el WhatsApp de '+(f.nombre||'este proveedor'));return;}window.open('https://wa.me/'+t+'?text='+encodeURIComponent('Buen día, '+(f.nombre||'')+'. Quisiéramos cotizar materiales para un proyecto.'),'_blank','noopener');};
+  tr.querySelector('.prov-del').onclick=()=>{const l=ferreterias();l.splice(i,1);saveFerreterias(l);renderProvDir();};
+  tb.appendChild(tr);
+ });
+}
+$('prov-dir-add').onclick=()=>{
+ const nombre=($('prov-dir-nombre').value||'').trim();
+ const tel=telNorm($('prov-dir-tel').value);
+ if(!nombre){flash('Escribe el nombre del proveedor');return;}
+ const l=ferreterias(); l.push({nombre,tel}); saveFerreterias(l);
+ $('prov-dir-nombre').value='';$('prov-dir-tel').value='';
+ renderProvDir(); flash('Proveedor agregado al directorio');
+};
+
+/* ============ SUB-PESTAÑA: COTIZACIONES DE PROVEEDORES Y TOTAL ============ */
+let quoteProvActual='';
+function provActivos(){
+ const s=new Set(P.provActivos||[]);
+ for(const c in P.preciosProveedores)for(const p in P.preciosProveedores[c])s.add(p);
+ return [...s];
+}
+function renderProvSub(){ fillProvAddSel(); renderProvActivos(); renderProvComp(); }
+function fillProvAddSel(){
+ const sel=$('prov-add-sel'); if(!sel)return;
+ const activos=provActivos();
+ const opts=ferreterias().map(f=>f.nombre).filter(n=>n&&!activos.includes(n));
+ sel.innerHTML=opts.length?opts.map(n=>`<option>${n.replace(/"/g,'&quot;')}</option>`).join(''):'<option value="">(agrega proveedores en la pestaña Proveedores)</option>';
+}
+function renderProvActivos(){
+ const tbl=$('tbl-prov-activos'); if(!tbl)return;
+ const tb=tbl.querySelector('tbody'); tb.innerHTML='';
+ const activos=provActivos();
+ if(!activos.length){tb.innerHTML='<tr><td colspan="5" class="hint" style="font-style:italic;padding:10px">Sin proveedores para comparar — agrégalos arriba (salen del directorio de la pestaña Proveedores).</td></tr>';return;}
+ activos.forEach(name=>{
+  const dirEnt=ferreterias().find(f=>f.nombre===name);
+  const nQuoted=Object.values(P.preciosProveedores).filter(pp=>pp[name]>0).length;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${name}</td><td>${dirEnt&&dirEnt.tel?'+'+dirEnt.tel:'—'}</td>
+   <td>${nQuoted} materiales</td>
+   <td><button class="btn sm prov-up"><span class="ic">⇪</span> Subir cotización</button></td>
+   <td style="text-align:center"><span class="prov-quitar" style="cursor:pointer;color:var(--accent-2);font-weight:700">✕ Quitar</span></td>`;
+  tr.querySelector('.prov-up').onclick=()=>{
+   if(!P.materiales||!P.materiales.length){flash('Calcula primero los materiales (botón Σ)');return;}
+   quoteProvActual=name; $('file-quote2').click();
+  };
+  tr.querySelector('.prov-quitar').onclick=()=>{
+   if(!confirm('¿Quitar a "'+name+'" del comparativo? Se borrarán sus precios cargados.'))return;
+   P.provActivos=(P.provActivos||[]).filter(n=>n!==name);
+   for(const c in P.preciosProveedores)delete P.preciosProveedores[c][name];
+   autosave(); renderProvSub(); renderMat();
+  };
+  tb.appendChild(tr);
+ });
+}
+$('prov-add-btn').onclick=()=>{
+ const n=$('prov-add-sel').value; if(!n){flash('No hay proveedores en el directorio — agrégalos en la pestaña Proveedores');return;}
+ P.provActivos=P.provActivos||[]; if(!P.provActivos.includes(n))P.provActivos.push(n);
+ autosave(); renderProvSub();
+};
+$('prov-recalc').onclick=async()=>{ await calcMateriales(); renderProvSub(); };
+$('file-quote2').onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ if(!quoteProvActual){flash('Elige el proveedor con su botón «Subir cotización»');e.target.value='';return;}
+ if(!P.materiales||!P.materiales.length){flash('Calcula primero los materiales (botón Σ)');e.target.value='';return;}
+ P.provActivos=P.provActivos||[]; if(!P.provActivos.includes(quoteProvActual))P.provActivos.push(quoteProvActual);
+ parseQuoteFile(f,quoteProvActual,matched=>{ renderProvSub(); renderMat(); flash(matched?`✓ ${matched} materiales emparejados con «${quoteProvActual}»`:'No se emparejó ningún material — revisa el archivo (material + precio por fila)'); });
+ e.target.value='';
+};
+function bestCalc(){
+ const activos=provActivos();
+ let matBase=0,matMejor=0;
+ const rows=(P.materiales||[]).map(m=>{
+  const pp=P.preciosProveedores[m.codigo]||{};
+  const vals=activos.map(p=>pp[p]||0);
+  const cand=[{p:'base APU',v:m.precio||0},...activos.map((p,i)=>({p,v:vals[i]}))].filter(x=>x.v>0);
+  let mejor=0,mejorProv='—';
+  if(cand.length){const mn=cand.reduce((a,b)=>b.v<a.v?b:a);mejor=mn.v;mejorProv=mn.p;}
+  matBase+=(m.cant||0)*(m.precio||0);
+  matMejor+=(m.cant||0)*(mejor||m.precio||0);
+  return {m,vals,mejor,mejorProv};
+ });
+ return {activos,rows,matBase,matMejor};
+}
+function renderProvComp(){
+ const tbl=$('tbl-prov-comp'); if(!tbl)return;
+ const {activos,rows,matBase,matMejor}=bestCalc();
+ tbl.querySelector('thead').innerHTML='<tr><th>Código</th><th style="width:26%">Insumo</th><th>Und</th><th>Cant.</th><th>Base APU</th>'+activos.map(p=>`<th>${p.slice(0,16)}</th>`).join('')+'<th>Más económico</th></tr>';
+ const tb=tbl.querySelector('tbody'); tb.innerHTML='';
+ if(!rows.length){tb.innerHTML=`<tr><td colspan="${6+activos.length}" class="hint" style="font-style:italic;padding:12px">Sin materiales — pulsa «Calcular / actualizar materiales».</td></tr>`;}
+ rows.forEach(({m,vals,mejor,mejorProv})=>{
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${m.codigo||''}</td><td>${m.nombre}</td><td>${m.unidad||''}</td>
+   <td style="text-align:right">${(m.cant||0).toLocaleString('es-CO')}</td>
+   <td style="text-align:right" class="${mejorProv==='base APU'&&mejor?'best':''}">${m.precio?fmt(m.precio):'—'}</td>`+
+   vals.map(v=>`<td style="text-align:right" class="${v>0&&v===mejor?'best':''}">${v>0?fmt(v):'—'}</td>`).join('')+
+   `<td class="best">${mejor?fmt(mejor)+' · '+mejorProv:'—'}</td>`;
+  tb.appendChild(tr);
+ });
+ renderProvTotals(matBase,matMejor);
+}
+function renderProvTotals(matBase,matMejor){
+ renderPresStats();
+ const dir=P.presupuesto.totalDirecto||0, ind=P.presupuesto.totalIndirecto||0;
+ const ahorro=Math.max(0,matBase-matMejor);
+ const finalDir=Math.max(0,dir-ahorro);
+ const st=$('prov-tot-stats'); if(!st)return;
+ st.innerHTML=`
+  <div class="stat"><span class="lbl">Directo APU</span><span class="val viol">${fmt(dir)}</span></div>
+  <div class="stat"><span class="lbl">Ahorro con proveedores</span><span class="val ok">−${fmt(ahorro)}</span></div>
+  <div class="stat"><span class="lbl">Total final directo (APU + prov.)</span><span class="val ok">${fmt(finalDir)}</span></div>
+  <div class="stat"><span class="lbl">Total con indirectos</span><span class="val">${fmt(finalDir+ind)}</span></div>`;
+}
+$('btn-cf-push2').onclick=()=>pushPreciosCF('prov-tot-hint');
+$('btn-prov-xls').onclick=()=>{
+ const {activos,rows}=bestCalc();
+ if(!rows.length){flash('Sin materiales para exportar');return;}
+ const head=['Código','Insumo','Und','Cantidad','Base APU',...activos,'Más económico','Proveedor elegido'];
+ const aoa=[head,...rows.map(({m,vals,mejor,mejorProv})=>[m.codigo||'',m.nombre,m.unidad||'',m.cant||0,m.precio||0,...vals,mejor||m.precio||0,mejorProv])];
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),'Comparativo');
+ XLSX.writeFile(wb,P.id+'_comparativo_proveedores.xlsx');
 };
 
 /* ---- exports Excel del presupuesto ---- */

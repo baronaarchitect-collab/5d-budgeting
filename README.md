@@ -19,11 +19,16 @@ correr por sí solo:
    nombre contra la base **APU Gobernación** servida por un Worker de Cloudflare D1
    (`cloudflare/worker.js`). Si no hay conexión, usa la base local
    `ejemplos/apus_gobernacion.json`.
-4. **Cotización con proveedores.** Manda a cotizar por especialidad, sube hasta 3
-   cotizaciones (Excel/CSV), empareja insumos por nombre y resalta el proveedor más
-   económico; puede empujar los precios de vuelta a Cloudflare.
+4. **Cotización con proveedores.** Manda a cotizar por WhatsApp o correo — un material, un
+   **APU completo** o **todo el proyecto** en un solo mensaje. Sube las cotizaciones
+   recibidas (Excel/CSV), empareja insumos por nombre y resalta el proveedor más económico.
 5. **Materiales totales.** Consolida `cantidad × rendimiento × (1+desperdicio)` de todos
    los APUs enlazados y exporta a Excel.
+6. **Directorio de proveedores + total con mejor precio.** Pestaña **Proveedores** para
+   guardar nombre + WhatsApp. En **Presupuesto** hay dos sub-pestañas: *APU y actividades*
+   y *Cotizaciones de proveedores y total*, donde agregas/quitas proveedores, subes su
+   cotización y ves el **Total final = costo directo APU − ahorro** comprando cada material
+   al proveedor más económico.
 
 ## Cómo correr
 
