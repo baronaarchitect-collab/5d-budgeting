@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5D Budgeting · Acceso de miembros</title>
+<style>
+  :root{
+    --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
+    --accent:#f4b942;--accent-2:#ff5252;--ok:#6bd96b;--viol:#9c6bff;
+    --mono:'JetBrains Mono','SF Mono','Menlo',monospace;--display:'Space Grotesk','Inter',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{min-height:100vh;background:radial-gradient(1200px 600px at 50% -10%,rgba(156,107,255,.12),transparent),var(--bg-0);color:var(--text);font-family:var(--mono);font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+  a{color:var(--accent);text-decoration:none}
+  .brand{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.5px;margin-bottom:4px;text-align:center;cursor:pointer}
+  .brand span{color:var(--viol);font-size:10px;letter-spacing:3px;display:block;line-height:1.6}
+  .card{width:min(420px,94vw);background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:26px 24px;margin-top:18px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .tabs{display:flex;gap:6px;background:var(--bg-0);border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:18px}
+  .tab{flex:1;padding:9px;text-align:center;border-radius:7px;cursor:pointer;color:var(--text-dim);font-family:var(--mono);font-size:12px}
+  .tab.on{background:var(--accent);color:#1a1305;font-weight:700}
+  .ctl{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+  .ctl label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim)}
+  .ctl input{background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:11px;border-radius:8px;font-family:var(--mono);font-size:13px}
+  .ctl input:focus{outline:none;border-color:var(--accent)}
+  .btn{width:100%;padding:12px;background:var(--accent);color:#1a1305;border:none;border-radius:9px;font-family:var(--display);font-weight:700;font-size:13px;cursor:pointer;margin-top:4px}
+  .btn:hover{filter:brightness(1.05)}
+  .msg{margin-top:12px;font-size:11px;text-align:center;min-height:16px}
+  .msg.err{color:var(--accent-2)} .msg.ok{color:var(--ok)}
+  .foot{margin-top:16px;font-size:10px;color:var(--text-dim);text-align:center;line-height:1.7}
+  .hidden{display:none}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<script src="auth.js"></script>
+</head>
+<body>
+  <div class="brand" onclick="location.href='index.html'">5D BUDGETING<span>LIFECITY · ACCESO DE MIEMBROS</span></div>
+  <div class="card">
+    <div class="tabs">
+      <div class="tab on" data-t="login">Iniciar sesión</div>
+      <div class="tab" data-t="signup">Crear cuenta</div>
+    </div>
+
+    <form id="form-login">
+      <div class="ctl"><label>Correo</label><input id="li-email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
+      <div class="ctl"><label>Contraseña</label><input id="li-pass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+      <button class="btn" type="submit">Entrar a mi dashboard</button>
+    </form>
+
+    <form id="form-signup" class="hidden">
+      <div class="ctl"><label>Nombre</label><input id="su-name" placeholder="Nombre y apellido"></div>
+      <div class="ctl"><label>Correo</label><input id="su-email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
+      <div class="ctl"><label>Contraseña</label><input id="su-pass" type="password" autocomplete="new-password" placeholder="mínimo 6 caracteres"></div>
+      <button class="btn" type="submit">Crear cuenta y empezar</button>
+    </form>
+
+    <div class="msg" id="msg"></div>
+    <div class="foot">
+      🔒 Cuentas <b>locales de este navegador</b>: tus datos y proyectos se guardan solo en este equipo (localStorage), no en un servidor. Ideal para uso personal o de escritorio.
+    </div>
+  </div>
+
+<script>
+const $=id=>document.getElementById(id);
+const QS=new URLSearchParams(location.search);
+const NEXT=QS.get('next')||'dashboard.html';
+const msg=(t,cls)=>{const m=$('msg');m.textContent=t;m.className='msg '+(cls||'');};
+
+// si ya hay sesión, ir directo
+if(AUTH.current()) location.replace(NEXT);
+
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+  $('form-login').classList.toggle('hidden',t.dataset.t!=='login');
+  $('form-signup').classList.toggle('hidden',t.dataset.t!=='signup');
+  msg('');
+});
+
+$('form-login').onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    await AUTH.login($('li-email').value,$('li-pass').value);
+    msg('Entrando…','ok'); location.href=NEXT;
+  }catch(err){ msg(err.message,'err'); }
+};
+$('form-signup').onsubmit=async e=>{
+  e.preventDefault();
+  try{
+    await AUTH.signup($('su-email').value,$('su-name').value,$('su-pass').value);
+    msg('Cuenta creada ✓','ok'); location.href=NEXT;
+  }catch(err){ msg(err.message,'err'); }
+};
+// si viene ?signup=1 abrir pestaña de registro
+if(QS.get('signup')) document.querySelector('.tab[data-t="signup"]').click();
+</script>
+</body>
+</html>

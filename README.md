@@ -47,11 +47,27 @@ vive en `localStorage`).
 
 Prueba rápida: **Nuevo proyecto → pestaña Modelo 3D → Subir IFC → `ejemplos/demo.ifc`.**
 
+## Sitio y cuentas de miembros
+
+- **`index.html`** — landing de marketing (mercado, problema, solución y sección de
+  miembros) con llamados a registrarse.
+- **`login.html`** — crear cuenta / iniciar sesión.
+- **`dashboard.html`** — dashboard privado con los proyectos de cada usuario.
+- **`presupuesto.html`** — la app; requiere sesión.
+
+⚠️ **Autenticación local:** las cuentas y los proyectos viven en el `localStorage` del
+navegador (contraseñas con hash SHA-256 + sal). No es seguridad de servidor: separa los
+proyectos por usuario en el mismo equipo. Para auth real (multi-dispositivo) haría falta un
+backend. Requiere `http://localhost` o `https://` (contexto seguro para el hash).
+
 ## Estructura
 
 ```
-index.html              Lista de proyectos (launcher)
-presupuesto.html        La app (Modelo 3D / Presupuesto / Materiales)
+index.html              Landing de marketing (página principal)
+login.html              Crear cuenta / iniciar sesión (auth local)
+dashboard.html          Dashboard privado por usuario (lista de proyectos)
+auth.js                 Autenticación local (localStorage, hash SHA-256)
+presupuesto.html        La app (Modelo 3D / Presupuesto / Materiales / Proveedores)
 serve.py                Servidor local opcional (estático + respaldo de proyectos)
 ejemplos/
   demo.ifc              IFC de prueba con parámetros PSI_* y quantity sets

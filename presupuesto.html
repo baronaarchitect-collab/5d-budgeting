@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="auth.js"></script>
+<script>if(window.AUTH)AUTH.guard();</script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -99,7 +101,7 @@
 </head>
 <body>
 <div id="topbar">
-  <div class="brand" onclick="location.href='index.html'">5D BUDGETING<span>PRESUPUESTACIÓN · LIFECITY</span></div>
+  <div class="brand" onclick="location.href='dashboard.html'">5D BUDGETING<span>PRESUPUESTACIÓN · LIFECITY</span></div>
   <div class="pname" id="pname">—</div>
   <button class="tabbtn on" data-tab="modelo"><span class="ic">◈</span> Modelo 3D</button>
   <button class="tabbtn" data-tab="poliza" style="display:none"><span class="ic">§</span> Datos póliza</button>
@@ -556,7 +558,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 
 /* ================= ESTADO ================= */
 const $=id=>document.getElementById(id);
-const KEY='budgeting5d_projects';
+const KEY=(window.AUTH&&AUTH.current())?AUTH.projectsKey():'budgeting5d_projects';
 const QS=new URLSearchParams(location.search);
 const PID=QS.get('id')||('proyecto_'+Date.now().toString(36));
 const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
