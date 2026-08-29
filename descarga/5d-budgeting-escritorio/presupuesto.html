@@ -88,6 +88,7 @@
   /* MODAL */
   .modal{position:fixed;inset:0;background:rgba(5,8,13,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:900}
   .modal.on{display:flex}
+  #modal-wa{z-index:960}
   .modal .box2{background:var(--bg-1);border:1px solid var(--line);width:min(860px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   .modal .mh{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line)}
   .modal .mh h3{font-family:var(--display);font-size:14px;font-weight:600}
@@ -687,7 +688,12 @@ document.querySelectorAll('.subtab[data-sub]').forEach(b=>b.onclick=()=>{
 });
 
 /* ================= MODELO: IFC ================= */
-const CAT_MAP={WALL:'Muros',WALLSTANDARDCASE:'Muros',SLAB:'Losas',COLUMN:'Columnas',BEAM:'Vigas',DOOR:'Puertas',WINDOW:'Ventanas',STAIR:'Escaleras',STAIRFLIGHT:'Escaleras',ROOF:'Cubiertas',FOOTING:'Cimentación',PILE:'Cimentación',SPACE:'Espacios',COVERING:'Acabados',RAILING:'Barandas',CURTAINWALL:'Muro cortina',MEMBER:'Estructura metálica',PLATE:'Estructura metálica',FLOWTERMINAL:'Aparatos MEP',FLOWSEGMENT:'Redes MEP',PIPESEGMENT:'Redes MEP',DUCTSEGMENT:'Redes MEP'};
+const CAT_MAP={WALL:'Muros',WALLSTANDARDCASE:'Muros',SLAB:'Losas',COLUMN:'Columnas',BEAM:'Vigas',DOOR:'Puertas',WINDOW:'Ventanas',STAIR:'Escaleras',STAIRFLIGHT:'Escaleras',ROOF:'Cubiertas',FOOTING:'Cimentación',PILE:'Cimentación',SPACE:'Espacios',COVERING:'Acabados',RAILING:'Barandas',CURTAINWALL:'Muro cortina',MEMBER:'Estructura metálica',PLATE:'Estructura metálica',FLOWTERMINAL:'Aparatos MEP',
+ FLOWSEGMENT:'Tubería/red MEP',PIPESEGMENT:'Tubería',DUCTSEGMENT:'Ducto',CABLECARRIERSEGMENT:'Conduit/bandeja',CABLESEGMENT:'Cableado',CONDUITSEGMENT:'Conduit',
+ FLOWFITTING:'Uniones/accesorios MEP',PIPEFITTING:'Uniones de tubería',DUCTFITTING:'Uniones de ducto',CABLECARRIERFITTING:'Uniones de conduit',JUNCTIONBOX:'Cajas/uniones',
+ SANITARYTERMINAL:'Aparatos sanitarios',VALVE:'Válvulas'};
+/* Categorías MEP que se separan por DIÁMETRO (cada diámetro = actividad/ítem nuevo) */
+const MEP_SPLIT=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE)$/;
 
 function parseIfcText(text){
  const counts={}; let m;
@@ -730,7 +736,24 @@ function normFecha(v){
  if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
  return '';
 }
-const ELEM_RE=/^(WALL|WALLSTANDARDCASE|SLAB|COLUMN|BEAM|DOOR|WINDOW|STAIR|STAIRFLIGHT|ROOF|FOOTING|PILE|COVERING|MEMBER|PLATE|RAILING|CURTAINWALL|BUILDINGELEMENTPROXY|FLOWTERMINAL|FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|FLOWFITTING|RAMP|ELEMENTASSEMBLY)$/;
+const ELEM_RE=/^(WALL|WALLSTANDARDCASE|SLAB|COLUMN|BEAM|DOOR|WINDOW|STAIR|STAIRFLIGHT|ROOF|FOOTING|PILE|COVERING|MEMBER|PLATE|RAILING|CURTAINWALL|BUILDINGELEMENTPROXY|FLOWTERMINAL|FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE|SANITARYTERMINAL|RAMP|ELEMENTASSEMBLY)$/;
+/* extrae un rótulo de diámetro del nombre del tipo (1/2", 3/4", DN50, Ø50, 50mm) */
+function diamFromName(s){
+ s=String(s||'').replace(/\\/g,'');
+ let m=s.match(/(\d+\s*\/\s*\d+)\s*(?:["″'']|in\b|pulg)/i); if(m)return m[1].replace(/\s+/g,'')+'"';
+ m=s.match(/\bDN\s*(\d+)/i); if(m)return 'DN'+m[1];
+ m=s.match(/[ØøⵁΦφ]\s*(\d+(?:[.,]\d+)?)/); if(m)return 'Ø'+m[1].replace(',','.');
+ m=s.match(/(\d+(?:[.,]\d+)?)\s*mm\b/i); if(m)return 'Ø'+m[1].replace(',','.')+'mm';
+ m=s.match(/(\d+(?:[.,]\d+)?)\s*(?:["″'']|in\b|pulg)/i); if(m)return m[1].replace(',','.')+'"';
+ return '';
+}
+/* formatea un valor numérico de diámetro (IFC en metros o mm) a un rótulo Ømm */
+function fmtDiam(v){
+ v=parseFloat(v); if(!(v>0))return '';
+ let mm = v<1 ? v*1000 : (v<3 ? v*25.4 : v); // <1 → metros; 1..3 → pulgadas; si ya es mm, se deja
+ mm=Math.round(mm*10)/10;
+ return 'Ø'+(mm%1===0?mm:mm.toFixed(1))+'mm';
+}
 function indexIfcEntities(text){
  const ents={};
  const re=/#(\d+)\s*=\s*IFC([A-Z0-9]+)\s*\(([\s\S]*?)\)\s*;/g;
@@ -797,13 +820,45 @@ function parseTiposCantidades(ents){
   if(!q)continue;
   for(let i=0;i<refs.length-1;i++)if(ents[refs[i]]&&ELEM_RE.test(ents[refs[i]].t))addQ(refs[i],q);
  }
+ // 3b) DIÁMETRO por elemento (para separar tuberías/conduits/uniones por diámetro)
+ const diaProp={};
+ for(const id in ents){
+  const e=ents[id]; if(e.t!=='PROPERTYSINGLEVALUE')continue;
+  const strs=getStrs(e.p);
+  const nombre=(strs[0]||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
+  if(!/(DIAMETER|DIAMETRO|NOMINAL|\bDN\b|\bSIZE\b|CALIBRE|OUTSIDE\s*DIAM|OUTER\s*DIAM|\bOD\b|\bDIAM)/.test(nombre))continue;
+  const mv=e.p.match(/IFC(?:POSITIVELENGTHMEASURE|LENGTHMEASURE|REAL|LABEL|TEXT|IDENTIFIER)\s*\(\s*(?:'((?:[^']|'')*)'|([-\d.eE+]+))\s*\)/);
+  if(!mv)continue;
+  let label='';
+  if(mv[1]!==undefined){ const raw=mv[1].replace(/''/g,"'"); label=diamFromName(raw) || (isFinite(parseFloat(raw))?fmtDiam(parseFloat(raw)):'') || raw.trim(); }
+  else if(mv[2]!==undefined){ label=fmtDiam(parseFloat(mv[2])); }
+  if(label)diaProp[id]=label;
+ }
+ const diaSet={};
+ for(const id in ents){
+  const t=ents[id].t; if(t!=='ELEMENTQUANTITY'&&t!=='PROPERTYSET')continue;
+  for(const r of getRefs(ents[id].p))if(diaProp[r]){diaSet[id]=diaProp[r];break;}
+ }
+ const elemDia={};
+ for(const id in ents){
+  if(ents[id].t!=='RELDEFINESBYPROPERTIES')continue;
+  const refs=getRefs(ents[id].p);
+  const d=diaSet[refs[refs.length-1]];
+  if(!d)continue;
+  for(let i=0;i<refs.length-1;i++)elemDia[refs[i]]=d;
+ }
  // 4) tipo de Revit por elemento (Name sin el id de instancia) + agregado por tipo
+ //     MEP (tubería/conduit/uniones) se separa por DIÁMETRO → cada diámetro es un tipo/ítem nuevo
  const tipos={}, elems={};
  for(const id in ents){
   const e=ents[id];
   if(!ELEM_RE.test(e.t))continue;
   const strs=getStrs(e.p);
-  const tipo=(strs[1]||e.t).replace(/:\d+$/,'');
+  let tipo=(strs[1]||e.t).replace(/:\d+$/,'');
+  if(MEP_SPLIT.test(e.t)){
+   const d=elemDia[id]||diamFromName(strs[1]||'')||diamFromName(tipo);
+   tipo=tipo+' · '+(d||'Ø s/d');
+  }
   const cat=CAT_MAP[e.t]||e.t;
   const q=elemQ[id]||{};
   elems[id]={tipo,cat,q};
@@ -875,8 +930,7 @@ function parsePsiActivities(ents){
   for(let i=0;i<refs.length-1;i++){
    const el=ents[refs[i]];
    if(!el||!ELEM_RE.test(el.t))continue;
-   const strs=getStrs(el.p);
-   let name=(strs[1]||el.t).replace(/:\d+$/,'');
+   const name=(IFC_ELEMS[refs[i]]&&IFC_ELEMS[refs[i]].tipo) || (getStrs(el.p)[1]||el.t).replace(/:\d+$/,'');
    a.tipos[name]=(a.tipos[name]||0)+1;
    (a.elems=a.elems||[]).push(refs[i]);
    a.qty++;

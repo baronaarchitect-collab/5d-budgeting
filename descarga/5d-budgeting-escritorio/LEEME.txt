@@ -4,8 +4,14 @@
 Gracias por tu compra. Esta es la versión que corre en tu propio computador,
 funciona sin conexión y te deja subir los APUs de TU ciudad como base principal.
 
-CÓMO ABRIRLA
-------------
+INSTALACIÓN RÁPIDA (recomendada)
+--------------------------------
+Doble clic en  INSTALAR.bat . Copia el programa a tu equipo y crea un acceso
+directo "5D Budgeting" en el Escritorio y en el Menú Inicio. Luego ábrelo desde
+ese acceso directo.
+
+CÓMO ABRIRLA (sin instalar)
+---------------------------
 Opción A (recomendada — sirve el visor IFC y guarda respaldo en disco):
    1) Instala Python 3 desde https://www.python.org/downloads/
       (marca "Add Python to PATH" durante la instalación).
