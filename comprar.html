@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5D Budgeting · Versión de escritorio (Pro)</title>
+<style>
+  :root{
+    --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
+    --accent:#f4b942;--accent-2:#ff5252;--ok:#6bd96b;--viol:#9c6bff;
+    --mono:'JetBrains Mono','SF Mono','Menlo',monospace;--display:'Space Grotesk','Inter',sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{min-height:100vh;background:radial-gradient(900px 480px at 50% -10%,rgba(156,107,255,.14),transparent),var(--bg-0);color:var(--text);font-family:var(--mono);font-size:14px;line-height:1.6}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 22px}
+  nav{border-bottom:1px solid var(--line)}
+  nav .row{display:flex;align-items:center;gap:14px;padding:12px 0}
+  .brand{font-family:var(--display);font-weight:700;font-size:17px;cursor:pointer}
+  .brand span{color:var(--viol);font-size:9px;letter-spacing:3px;display:block;line-height:1.3}
+  .grow{flex:1}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:10px;font-family:var(--display);font-weight:600;font-size:14px;cursor:pointer;border:1px solid var(--line);background:var(--bg-2);color:var(--text)}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:#1a1305;border-color:var(--accent)}
+  .btn.ok{background:var(--ok);color:#08240c;border-color:var(--ok)}
+  .btn.lg{padding:15px 26px;font-size:15px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,4.4vw,40px);line-height:1.12;margin-top:36px}
+  .sub{color:var(--text-dim);max-width:64ch;margin-top:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:34px}
+  @media(max-width:800px){.grid{grid-template-columns:1fr}}
+  .plan{background:var(--bg-1);border:1px solid var(--line);border-radius:16px;padding:26px}
+  .plan.hi{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .plan .tag{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--viol)}
+  .plan .price{font-family:var(--display);font-weight:700;font-size:32px;margin:8px 0 2px}
+  .plan .price small{font-size:13px;color:var(--text-dim);font-weight:400}
+  .plan ul{list-style:none;margin:16px 0 0;display:flex;flex-direction:column;gap:9px}
+  .plan li{font-size:13px;display:flex;gap:9px}.plan li::before{content:'✓';color:var(--ok);font-weight:700}
+  .plan li.no{color:var(--text-dim)}.plan li.no::before{content:'—';color:var(--text-dim)}
+  .box{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:22px;margin-top:22px}
+  .box h3{font-family:var(--display);font-size:16px;margin-bottom:10px}
+  .step{display:flex;gap:12px;align-items:flex-start;margin:10px 0}
+  .step .n{flex:none;width:26px;height:26px;border-radius:7px;background:var(--bg-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;color:var(--accent);font-size:13px}
+  .muted{color:var(--text-dim);font-size:12px}
+  input{background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:10px;border-radius:8px;font-family:var(--mono);font-size:13px}
+  .flash{margin-top:10px;font-size:12px;min-height:16px}
+  .warn{border-left:3px solid var(--accent);background:rgba(244,185,66,.06)}
+  footer{border-top:1px solid var(--line);margin-top:50px;padding:22px 0;color:var(--text-dim);font-size:12px}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+</head>
+<body>
+<nav><div class="wrap row">
+  <div class="brand" onclick="location.href='index.html'">5D BUDGETING<span>LIFECITY · BIM HUB</span></div>
+  <div class="grow"></div>
+  <a class="btn" href="index.html">← Inicio</a>
+</div></nav>
+
+<div class="wrap">
+  <h1>Versión de escritorio <span style="color:var(--viol)">Pro</span></h1>
+  <p class="sub">Trabaja sin conexión en tu propio computador y <b>sube los APUs de tu ciudad</b> como base principal. Un solo pago, tuya para siempre en ese equipo.</p>
+
+  <div class="grid">
+    <div class="plan">
+      <div class="tag">Gratis · Web</div>
+      <div class="price">$0</div>
+      <ul>
+        <li>Importar IFC + visor 3D</li>
+        <li>APU desde la nube (Cloudflare)</li>
+        <li>Materiales y cotización con proveedores</li>
+        <li class="no">Subir los APUs de tu ciudad</li>
+        <li class="no">Uso 100% sin conexión</li>
+      </ul>
+      <a class="btn" style="width:100%;justify-content:center;margin-top:18px" href="login.html?signup=1">Usar la versión web</a>
+    </div>
+
+    <div class="plan hi">
+      <div class="tag">Pro · Escritorio</div>
+      <div class="price" id="precio">$120.000 <small>COP · pago único</small></div>
+      <ul>
+        <li>Todo lo de la versión web</li>
+        <li><b>Sube los APUs de tu propia ciudad</b> (JSON con insumos o Excel)</li>
+        <li>Funciona 100% sin conexión, en tu equipo</li>
+        <li>Tus proyectos y tu base APU quedan en tu computador</li>
+        <li>Actualizaciones incluidas</li>
+      </ul>
+      <button class="btn primary lg" id="btn-pagar" style="width:100%;justify-content:center;margin-top:18px"><span>🛒</span> Comprar en Hotmart</button>
+      <div class="flash" id="pay-flash"></div>
+    </div>
+  </div>
+
+  <div class="box" id="box-descarga">
+    <h3>⬇️ Descargar la versión de escritorio</h3>
+    <div class="step"><div class="n">1</div><div>Pulsa <b>Pagar con Nubank</b> y completa el pago.</div></div>
+    <div class="step"><div class="n">2</div><div>Vuelve aquí y activa la descarga (con tu código de activación, si aplica).</div></div>
+    <div class="step"><div class="n">3</div><div>Descomprime el ZIP y ejecuta <b>Iniciar 5D Budgeting.bat</b> (Windows) o <code>python serve.py</code>.</div></div>
+
+    <div id="gate" style="margin-top:14px">
+      <div id="gate-code" style="display:none">
+        <p class="muted">Ingresa el código de activación que te enviamos tras el pago:</p>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <input id="code" placeholder="Código de activación">
+          <button class="btn" id="btn-code">Activar</button>
+        </div>
+      </div>
+      <div id="gate-honor" style="display:none">
+        <button class="btn ok" id="btn-yapague"><span>✓</span> Ya pagué — activar y descargar</button>
+      </div>
+      <div class="flash" id="gate-flash"></div>
+    </div>
+
+    <div id="dl" style="display:none;margin-top:14px">
+      <a class="btn ok lg" id="btn-dl" href="descarga/5d-budgeting-escritorio.zip" download><span>⬇️</span> Descargar ZIP (versión de escritorio)</a>
+      <p class="muted" style="margin-top:8px">Incluye la app, el lanzador y la carpeta de ejemplos. Requiere Python 3 para el modo servidor (recomendado), o ábrela directamente en el navegador.</p>
+    </div>
+  </div>
+
+  <div class="box warn" id="owner-note">
+    <h3>⚙️ Para el dueño de la cuenta (configura tu cobro)</h3>
+    <p class="muted">El botón abre tu <b>checkout de Hotmart</b>. Edita <code>comprar.html</code> (objeto <code>PAGO</code> arriba del script):</p>
+    <div class="step"><div class="n">A</div><div>Pega el <b>link de Hotmart</b> de tu producto en <code>PAGO.link</code> (ej: <code>https://pay.hotmart.com/XXXXXXXXX</code>).</div></div>
+    <div class="step"><div class="n">B</div><div>Ajusta el precio mostrado en <code>PAGO.precioCOP</code> (solo es la etiqueta; el cobro real lo define Hotmart).</div></div>
+    <div class="step"><div class="n">C</div><div><b>Entrega automática (recomendado):</b> en Hotmart sube el ZIP como el producto digital, o pon esta página como “página de gracias”. Así el comprador recibe la descarga tras pagar, sin depender del botón “Ya pagué”.</div></div>
+    <div class="step"><div class="n">D</div><div><b>Código de activación (opcional):</b> define <code>ACCESS_CODE</code> para exigir un código (que envías tras el pago). Si lo dejas vacío, la descarga se activa por confianza (“Ya pagué”).</div></div>
+    <p class="muted">Nota: la descarga en esta página se activa del lado del navegador. Para entrega blindada, usa la entrega de Hotmart (arriba) o el backend que haremos después.</p>
+  </div>
+</div>
+
+<footer><div class="wrap">5D BUDGETING · LifeCity BIM Hub — versión de escritorio Pro.</div></footer>
+
+<script>
+/* ================== CONFIGURA AQUÍ TU COBRO (HOTMART) ==================
+   Pega el link de checkout de tu producto en Hotmart (pay.hotmart.com/...). */
+const PAGO = {
+  link:   '',            // <-- PEGA AQUÍ tu link de Hotmart (ej: https://pay.hotmart.com/XXXXXXXXX)
+  precioCOP: 120000
+};
+const ACCESS_CODE = '';  // Déjalo vacío para activación por confianza; ponle un código para exigirlo.
+/* ====================================================================== */
+
+const $=id=>document.getElementById(id);
+$('precio').innerHTML='$'+PAGO.precioCOP.toLocaleString('es-CO')+' <small>COP · pago único</small>';
+
+function revealGate(){
+  if(ACCESS_CODE){ $('gate-code').style.display='block'; }
+  else { $('gate-honor').style.display='block'; }
+}
+function unlock(){
+  try{ localStorage.setItem('budgeting5d_pro','1'); }catch(e){}
+  $('dl').style.display='block';
+  $('gate-flash').innerHTML='<b style="color:var(--ok)">✓ Descarga activada. También desbloqueaste «subir tus APUs» en la versión web de este navegador.</b>';
+  $('btn-dl').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+$('btn-pagar').onclick=()=>{
+  const f=$('pay-flash');
+  if(PAGO.link){
+    window.open(PAGO.link,'_blank','noopener');
+    f.innerHTML='Abrimos el checkout de Hotmart en otra pestaña. Al terminar el pago, activa tu descarga abajo. ↓';
+    revealGate();
+  } else {
+    f.innerHTML='<b style="color:var(--accent)">El link de pago aún no está configurado.</b> Pega tu link de Hotmart en <code>PAGO.link</code> (ver «Para el dueño de la cuenta»).';
+  }
+};
+
+$('btn-code') && ($('btn-code').onclick=()=>{
+  if(($('code').value||'').trim()===ACCESS_CODE && ACCESS_CODE){ unlock(); }
+  else { $('gate-flash').innerHTML='<b style="color:var(--accent-2)">Código incorrecto.</b>'; }
+});
+$('btn-yapague') && ($('btn-yapague').onclick=unlock);
+
+// si ya activó antes en este navegador, muestra la descarga directo
+try{ if(localStorage.getItem('budgeting5d_pro')==='1'){ revealGate(); unlock(); } }catch(e){}
+</script>
+</body>
+</html>

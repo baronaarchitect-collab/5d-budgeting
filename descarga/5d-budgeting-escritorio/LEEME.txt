@@ -1,0 +1,45 @@
+5D BUDGETING — VERSIÓN DE ESCRITORIO (PRO)
+==========================================
+
+Gracias por tu compra. Esta es la versión que corre en tu propio computador,
+funciona sin conexión y te deja subir los APUs de TU ciudad como base principal.
+
+CÓMO ABRIRLA
+------------
+Opción A (recomendada — sirve el visor IFC y guarda respaldo en disco):
+   1) Instala Python 3 desde https://www.python.org/downloads/
+      (marca "Add Python to PATH" durante la instalación).
+   2) Doble clic en  "Iniciar 5D Budgeting.bat"  (Windows).
+      En Mac/Linux, abre una terminal en esta carpeta y ejecuta:  python3 serve.py
+   3) Se abre en http://localhost:8151
+
+Opción B (sin instalar nada):
+   Abre  dashboard.html  directamente en tu navegador (Chrome/Edge).
+   Nota: en este modo el respaldo en disco de proyectos no está disponible
+   (todo se guarda en el navegador). El resto funciona igual.
+
+SUBIR LOS APUs DE TU CIUDAD
+---------------------------
+Dentro de la app: pestaña "Presupuesto" → sub-pestaña "APU y actividades" →
+caja "Base APU propia — tu ciudad":
+   • "Subir mi base (JSON con insumos)"  → recomendado: incluye el desglose de
+     insumos para que los MATERIALES TOTALES también salgan de tus APUs.
+     Usa el botón "Plantilla JSON" para ver el formato y edítala con tus APUs.
+   • "Subir Excel/CSV (Código | Descripción | Unidad | Valor)" → rápido, sin
+     desglose de insumos.
+Tu base propia tiene precedencia sobre la base de la nube. Puedes volver a la
+base de la nube cuando quieras con "Volver a la base de la nube".
+
+QUÉ INCLUYE
+-----------
+   dashboard.html      Tus proyectos
+   presupuesto.html    La app (Modelo IFC / Presupuesto / Materiales / Proveedores)
+   serve.py            Servidor local opcional (puerto 8151)
+   ejemplos/           Modelo IFC de prueba, APUs demo, base local
+   cloudflare/         (opcional) Worker para servir una base APU en la nube
+
+Tus proyectos y tu base de APUs se guardan en ESTE computador (navegador).
+Externos por internet: fuentes (Google Fonts), three.js y web-ifc (visor 3D)
+y SheetJS (Excel). Para trabajar 100% offline, ábrela una vez con internet.
+
+Soporte: LifeCity BIM Hub.
