@@ -327,20 +327,23 @@
     </div>
   </div>
   <div class="box" id="box-apu-propia" style="border-left:3px solid var(--viol)">
-    <h3><span class="dot" style="background:var(--viol)"></span> Base APU propia — tu ciudad <span class="pill" style="background:rgba(156,107,255,.18);color:var(--viol);margin-left:6px">PRO · Escritorio</span></h3>
-    <p class="hint">Sube la base de APUs de <b>tu ciudad/entidad</b> y la app la usa como fuente principal (con precedencia sobre la nube). En <b>JSON</b> puedes incluir el desglose de insumos, para que los <b>materiales totales</b> también salgan de tus propios APUs.</p>
+    <h3><span class="dot" style="background:var(--viol)"></span> Base APU propia — tu ciudad <span class="pill" style="background:rgba(156,107,255,.18);color:var(--viol);margin-left:6px">PRO</span></h3>
+    <p class="hint">Sube la base de APUs de <b>tu ciudad/entidad</b> en <b>Excel/CSV o PDF</b> y la app los convierte a un formato digerible (actividades + insumos). Se usan como fuente principal (con precedencia sobre la nube) y puedes <b>subirlos a la nube (Cloudflare)</b> para tener tu propia base en línea.</p>
     <div class="btnrow" id="apu-propia-btns">
-      <label class="btn primary" for="file-apu-own"><span class="ic">⇪</span> Subir mi base (JSON con insumos)</label>
+      <label class="btn primary" for="file-apu-convert"><span class="ic">⇪</span> Convertir e importar (Excel / CSV / PDF)</label>
+      <input type="file" id="file-apu-convert" accept=".xlsx,.xls,.csv,.pdf" style="display:none">
+      <label class="btn" for="file-apu-own"><span class="ic">⇪</span> Importar JSON</label>
       <input type="file" id="file-apu-own" accept=".json" style="display:none">
-      <label class="btn" for="file-apu-own-xls"><span class="ic">⇪</span> Subir Excel/CSV (Código|Descripción|Unidad|Valor)</label>
       <input type="file" id="file-apu-own-xls" accept=".xlsx,.xls,.csv" style="display:none">
-      <button class="btn" id="btn-apu-own-tpl"><span class="ic">⇩</span> Plantilla JSON</button>
-      <button class="btn" id="btn-apu-own-clear"><span class="ic">↺</span> Volver a la base de la nube</button>
+      <button class="btn ok" id="btn-apu-cloud-push"><span class="ic">☁</span> Subir mi base a Cloudflare</button>
+      <button class="btn" id="btn-apu-own-tpl"><span class="ic">⇩</span> Plantilla</button>
+      <button class="btn" id="btn-apu-own-clear"><span class="ic">↺</span> Volver a la nube</button>
     </div>
     <p class="hint" id="apu-own-info"></p>
+    <p class="hint" id="apu-cloud-out"></p>
     <div id="apu-pro-lock" style="display:none">
-      <p class="hint" style="color:var(--accent)">🔒 Esta función es de la <b>versión de escritorio (de pago)</b>. Descárgala para subir los APUs de tu ciudad y trabajar sin conexión.</p>
-      <a class="btn primary" href="comprar.html"><span class="ic">★</span> Ver versión de pago / descargar</a>
+      <p class="hint" style="color:var(--accent)">🔒 Función <b>Pro</b>: sube tus APUs (Excel o PDF), la app los convierte y puedes guardarlos <b>en la nube</b> o usarlos en la <b>versión de escritorio</b> sin conexión.</p>
+      <a class="btn primary" href="comprar.html"><span class="ic">★</span> Activar Pro / descargar</a>
     </div>
   </div>
   <div class="box">
@@ -1738,12 +1741,15 @@ function proGuard(){ if(!isPro()){ if(confirm('Subir tu propia base de APUs es u
 function reloadApuBaseAfterImport(){ APU_INS_CACHE&&Object.keys(APU_INS_CACHE).forEach(k=>delete APU_INS_CACHE[k]); loadApuBase(); }
 $('btn-apu-own-clear').onclick=()=>{ if(!proGuard())return; clearOwnApuBase(); reloadApuBaseAfterImport(); flash('Base propia desactivada — se vuelve a la base de la nube/local'); };
 $('btn-apu-own-tpl').onclick=()=>{
- const tpl=[{nombre:'MURO EN BLOQUE No.5 PAÑETADO DOS CARAS',unidad:'m2',precio_total:0,insumos:[
-   {codigo:'MAT0601',nombre:'Bloque de arcilla No.5',tipo:'MAT',unidad:'un',rendimiento:12.5,desperdicio:0.05,precio_unitario:2100},
-   {codigo:'MO0101',nombre:'Oficial de obra',tipo:'MO',unidad:'hh',rendimiento:0.9,desperdicio:0,precio_unitario:9800}
- ]}];
- download(JSON.stringify(tpl,null,1),'plantilla_apus_mi_ciudad.json','application/json');
- flash('Plantilla descargada — edítala con tus APUs y súbela como JSON');
+ const csv=[
+  'Actividad,Unidad,Insumo,Codigo,Tipo,Unidad Insumo,Rendimiento,Desperdicio,Precio Unitario',
+  'MURO EN BLOQUE No.5 PAÑETADO,m2,Bloque de arcilla No.5,MAT0601,MAT,un,12.5,0.05,2100',
+  'MURO EN BLOQUE No.5 PAÑETADO,m2,Mortero de pega 1:4,MAT0701,MAT,m3,0.012,0.10,410000',
+  'MURO EN BLOQUE No.5 PAÑETADO,m2,Oficial de obra,MO0101,MO,hh,0.9,0,9800',
+  'MURO EN BLOQUE No.5 PAÑETADO,m2,Ayudante,MO0102,MO,hh,0.9,0,6200'
+ ].join('\n');
+ download(csv,'plantilla_apus_mi_ciudad.csv','text/csv');
+ flash('Plantilla CSV descargada — una fila por insumo, la Actividad se repite. Súbela con «Convertir e importar».');
 };
 $('file-apu-own').onchange=e=>{
  const f=e.target.files[0]; if(!f){return;} if(!proGuard()){e.target.value='';return;}
@@ -1785,6 +1791,144 @@ $('file-apu-own-xls').onchange=e=>{
   }catch(err){flash('Error leyendo el Excel/CSV: '+err.message);}
  };
  r.readAsBinaryString(f); e.target.value='';
+};
+
+/* ====== CONVERSOR de APUs (Excel/CSV estructurado o PDF) → formato digerible ====== */
+function numCO(x){
+ if(typeof x==='number')return x;
+ let s=String(x||'').replace(/[$\s]/g,''); if(!s)return 0;
+ if(/,\d{1,3}$/.test(s)) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,'');
+ const v=parseFloat(s); return isFinite(v)?v:0;
+}
+function normH(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();}
+const H_ACT=/ACTIV|APU|PARTIDA|CAPITUL|\bITEM\b|ANALISIS/,H_ACTU=/(UNID|UND)\.?\s*(ACTIV|APU|PARTIDA)/,
+ H_INS=/INSUMO|MATERIAL|RECURSO|DESCRIP/,H_COD=/COD/,H_TIPO=/TIPO|CLASE/,
+ H_INSU=/(UNID|UND)\.?\s*(INSUMO|MATERIAL|RECURSO)/,H_REND=/RENDIM|CANTID|\bCANT\b/,
+ H_DESP=/DESPERD|\bDESP\b/,H_PREC=/(PRECIO|VALOR|\bVR\b).*(UNIT)|UNITARIO|V\.?UNIT/;
+function findHeaderRow(rows){
+ for(let i=0;i<Math.min(rows.length,20);i++){
+  const hs=(rows[i]||[]).map(normH);
+  if(hs.some(h=>H_INS.test(h))&&hs.some(h=>H_PREC.test(h)||H_REND.test(h)))return i;
+ }
+ return -1;
+}
+function parseApuWorkbook(rows){
+ const hi=findHeaderRow(rows);
+ if(hi<0){ // formato plano Código|Descripción|Unidad|Valor
+  const out=[];
+  for(const row of rows){
+   if(!Array.isArray(row)||row.length<2)continue;
+   const cod=String(row[0]||'').trim(), desc=String(row[1]||'').trim();
+   if(!desc||/descrip|codig/i.test(desc))continue;
+   out.push({nombre:(cod?cod+' · ':'')+desc,unidad:String(row[2]||'').trim(),precio_total:numCO(row[3]),insumos:[]});
+  }
+  return out;
+ }
+ const H=(rows[hi]||[]).map(normH), col=re=>H.findIndex(h=>re.test(h));
+ const cAct=col(H_ACT),cActU=col(H_ACTU),cIns=col(H_INS),cCod=col(H_COD),cTipo=col(H_TIPO),
+  cInsU=col(H_INSU),cRend=col(H_REND),cDesp=col(H_DESP),cPrec=col(H_PREC);
+ const acts={}, order=[]; let lastAct=null;
+ const ensure=(name,und)=>{if(!acts[name]){acts[name]={nombre:name,unidad:und||'',insumos:[]};order.push(name);}return acts[name];};
+ for(let i=hi+1;i<rows.length;i++){
+  const row=rows[i]; if(!Array.isArray(row))continue;
+  const actName=cAct>=0?String(row[cAct]||'').trim():'';
+  const insName=cIns>=0?String(row[cIns]||'').trim():'';
+  if(actName){ lastAct=actName; ensure(actName,cActU>=0?String(row[cActU]||'').trim():''); }
+  if(!insName)continue;
+  const key=lastAct||actName; if(!key)continue;
+  const a=ensure(key,'');
+  const rend=cRend>=0?numCO(row[cRend]):0, prec=cPrec>=0?numCO(row[cPrec]):0;
+  if(!(rend>0)&&!(prec>0))continue;
+  let tipo=cTipo>=0?normH(row[cTipo]):'';
+  tipo=['MO','MQ','MAT'].includes(tipo)?tipo:(/(MANO|OBRA|OFICIAL|AYUD|CUADRILLA)/.test(tipo)?'MO':/(EQUIP|MAQUIN|HERRAM|TRANSP)/.test(tipo)?'MQ':'MAT');
+  a.insumos.push({codigo:cCod>=0?String(row[cCod]||'').trim():'',nombre:insName,tipo,
+   unidad:cInsU>=0?String(row[cInsU]||'').trim():'',rendimiento:rend||1,desperdicio:cDesp>=0?numCO(row[cDesp]):0,precio_unitario:prec});
+ }
+ return order.map(k=>acts[k]).filter(a=>a);
+}
+function parseApuPdfText(text){
+ const lines=text.split('\n').map(l=>l.replace(/\s{2,}/g,' ').trim()).filter(Boolean);
+ const acts=[]; let cur=null;
+ for(const ln of lines){
+  const nums=ln.match(/\d[\d.,]*/g)||[];
+  const letters=(ln.match(/[A-Za-zÁÉÍÓÚÑáéíóúñ]/g)||[]).length;
+  if(letters>6 && nums.length<=1 && ln.length<100 && /[A-ZÁÉÍÓÚÑ]/.test(ln[0]||'')){
+   cur={nombre:ln,unidad:'',insumos:[]}; acts.push(cur); continue;
+  }
+  if(cur && letters>3 && nums.length>=2){
+   const desc=ln.replace(/[\d.,]+/g,' ').replace(/\s{2,}/g,' ').trim();
+   const nn=nums.map(numCO).filter(v=>v>0);
+   if(desc.length<3||!nn.length)continue;
+   const precio=Math.max(...nn), rend=(nn.filter(v=>v<precio).sort((a,b)=>a-b)[0])||1;
+   cur.insumos.push({codigo:'',nombre:desc,tipo:/(MANO|OBRA|OFICIAL|AYUD)/i.test(desc)?'MO':'MAT',unidad:'',rendimiento:rend,desperdicio:0,precio_unitario:precio});
+  }
+ }
+ return acts.filter(a=>a.nombre);
+}
+async function extractPdfText(buf){
+ const pdfjs=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.min.mjs');
+ pdfjs.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/build/pdf.worker.min.mjs';
+ const doc=await pdfjs.getDocument({data:new Uint8Array(buf)}).promise;
+ let out='';
+ for(let p=1;p<=doc.numPages;p++){
+  const page=await doc.getPage(p); const tc=await page.getTextContent();
+  let lastY=null, line='';
+  for(const it of tc.items){
+   const y=it.transform[5];
+   if(lastY!==null && Math.abs(y-lastY)>3){ out+=line.trim()+'\n'; line=''; }
+   line+=it.str+' '; lastY=y;
+  }
+  out+=line.trim()+'\n';
+ }
+ return out;
+}
+function finalizarApus(apus){
+ apus=apus.filter(a=>a&&a.nombre);
+ apus.forEach((a,i)=>{a.id=i+1;a.precio_total=(a.insumos&&a.insumos.length)?a.insumos.reduce((s,x)=>s+(x.rendimiento||0)*(1+(x.desperdicio||0))*(x.precio_unitario||0),0):(a.precio_total||0);});
+ return apus;
+}
+$('file-apu-convert').onchange=async e=>{
+ const f=e.target.files[0]; if(!f){return;} if(!proGuard()){e.target.value='';return;}
+ try{
+  let apus=[];
+  if(/\.pdf$/i.test(f.name)){
+   flash('Leyendo y convirtiendo el PDF… (puede tardar)');
+   const txt=await extractPdfText(await f.arrayBuffer());
+   apus=parseApuPdfText(txt);
+  }else{
+   const buf=await f.arrayBuffer();
+   const wb=XLSX.read(buf,{type:'array'});
+   const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+   apus=parseApuWorkbook(rows);
+  }
+  apus=finalizarApus(apus);
+  if(!apus.length)throw new Error('no se detectaron APUs — revisa el formato o usa la plantilla');
+  saveOwnApuBase(apus); reloadApuBaseAfterImport();
+  const conIns=apus.filter(a=>a.insumos&&a.insumos.length).length;
+  flash(`✓ ${apus.length} APUs convertidos (${conIns} con insumos)${/\.pdf$/i.test(f.name)?' · PDF es best-effort: revisa en el buscador de APU antes de subir a la nube':''}`);
+ }catch(err){flash('Error convirtiendo: '+err.message);}
+ e.target.value='';
+};
+$('btn-apu-cloud-push').onclick=async()=>{
+ if(!proGuard())return;
+ const out=$('apu-cloud-out');
+ const own=loadOwnApuBase();
+ if(!own||!own.length){out.innerHTML='<b style="color:var(--accent)">Primero convierte/carga tu base propia (Excel/PDF/JSON).</b>';return;}
+ if(!cfUrl()){out.innerHTML='<b style="color:var(--accent-2)">Configura tu URL de Cloudflare</b> (botón «☁ URL Cloudflare» arriba) para subir tu base en línea.';return;}
+ const conIns=own.filter(a=>a.insumos&&a.insumos.length);
+ if(!conIns.length){out.innerHTML='<b style="color:var(--accent)">Tus APUs no traen insumos.</b> La nube guarda APUs con desglose (usa Excel long-format, PDF o JSON con insumos).';return;}
+ if(!confirm(`Subir ${conIns.length} APUs con insumos a tu Cloudflare (${cfUrl()})?`))return;
+ out.textContent=`Subiendo 0/${conIns.length}…`;
+ let ok=0,fail=0;
+ for(const a of conIns){
+  try{
+   const body={nombre:a.nombre,unidad:a.unidad||'',insumos:a.insumos.map(x=>({codigo:x.codigo||'',nombre:x.nombre,tipo:x.tipo||'MAT',unidad:x.unidad||'',rendimiento:x.rendimiento||1,desperdicio:x.desperdicio||0,precio_unitario:x.precio_unitario||0}))};
+   const r=await fetch(cfUrl()+'/api/apus',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const d=await r.json().catch(()=>({})); if(d&&d.ok)ok++;else fail++;
+  }catch(e){fail++;}
+  out.textContent=`Subiendo ${ok+fail}/${conIns.length}…`;
+ }
+ out.innerHTML=`<b style="color:var(--ok)">✓ ${ok} APUs subidos a tu Cloudflare</b>${fail?` · ${fail} fallaron`:''}. Ya quedan en tu base en línea (búscalos con «buscar APU»).`;
 };
 async function searchApus(q){
  if(!q||q.length<2)return [];
