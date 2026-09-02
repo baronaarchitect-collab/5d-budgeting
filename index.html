@@ -95,7 +95,10 @@
   .note{font-size:11px;color:var(--text-dim);margin-top:8px}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<script src="firebase-config.js"></script>
+<script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="saas.js"></script>
 </head>
 <body>
 
@@ -231,12 +234,16 @@
 
 <script>
 // Si ya hay sesión, cambia el CTA del nav por "Mi dashboard".
-if(window.AUTH && AUTH.current()){
-  const me=AUTH.currentUser();
-  document.getElementById('nav-cta').innerHTML=
-    '<a class="btn" href="login.html" onclick="AUTH.logout()">Salir</a>'+
-    '<a class="btn primary" href="dashboard.html">Mi dashboard →</a>';
-}
+(async()=>{
+  try{ await SAAS.ready; }catch(e){}
+  if(window.SAAS && SAAS.uid){
+    document.getElementById('nav-cta').innerHTML=
+      '<a class="btn" href="#" id="nav-logout">Salir</a>'+
+      '<a class="btn primary" href="dashboard.html">Mi dashboard →</a>';
+    const lo=document.getElementById('nav-logout');
+    if(lo) lo.onclick=async(e)=>{ e.preventDefault(); await SAAS.logout(); location.reload(); };
+  }
+})();
 </script>
 </body>
 </html>

@@ -17,7 +17,10 @@
   header .brand span{color:var(--viol);font-size:9px;letter-spacing:2px;display:block;line-height:1.4}
   header .grow{flex:1}
   .who{font-size:11px;color:var(--text-dim)}.who b{color:var(--text)}
-  .btn{padding:9px 14px;background:var(--bg-2);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .15s}
+  .chip{padding:3px 9px;border-radius:9px;font-size:9px;letter-spacing:.5px}
+  .chip.cloud{background:rgba(107,217,107,.16);color:var(--ok)} .chip.local{background:rgba(244,185,66,.16);color:var(--accent)}
+  .chip.pro{background:rgba(156,107,255,.18);color:var(--viol)}
+  .btn{padding:9px 14px;background:var(--bg-2);border:1px solid var(--line);color:var(--text);font-family:var(--mono);font-size:11px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
   .btn:hover{background:#232c3d;border-color:var(--accent)}
   .btn .ic{color:var(--accent);font-weight:700}
   .btn.primary{background:var(--accent);color:#1a1305;border-color:var(--accent);font-weight:600}.btn.primary .ic{color:#1a1305}
@@ -37,62 +40,71 @@
   .hint{font-size:10px;color:var(--text-dim);line-height:1.6}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<script src="firebase-config.js"></script>
+<script src="config.js"></script>
 <script src="auth.js"></script>
+<script src="saas.js"></script>
 </head>
 <body>
 <header>
   <div class="brand" onclick="location.href='index.html'">5D BUDGETING<span>PRESUPUESTACIÓN · LIFECITY BIM HUB</span></div>
+  <span id="chip-mode" class="chip local">…</span>
+  <span id="chip-pro" class="chip pro" style="display:none">★ Pro</span>
   <div class="grow"></div>
   <span class="who" id="who"></span>
-  <label class="btn" for="imp-json"><span class="ic">⇪</span> Importar JSON</label>
-  <input type="file" id="imp-json" accept=".json" style="display:none">
   <button class="btn primary" id="btn-nuevo"><span class="ic">+</span> Nuevo proyecto</button>
   <button class="btn" id="btn-logout"><span class="ic">⏻</span> Salir</button>
 </header>
 <main>
   <h2>Mis proyectos de presupuesto</h2>
-  <div id="grid"></div>
-  <p class="hint">Cada proyecto guarda: el modelo 3D importado (IFC / JSON LifeCity), el presupuesto (actividades enlazadas a APUs de Cloudflare + costos), los materiales totales y las cotizaciones de proveedores. Tus proyectos son privados de tu cuenta en este navegador.</p>
+  <div id="grid"><div class="empty">Cargando…</div></div>
+  <p class="hint" id="foot"></p>
 </main>
 <script>
-if(!AUTH.guard()) { /* redirigido a login */ }
 const $=id=>document.getElementById(id);
-const KEY=AUTH.projectsKey();
-const read=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){return{}}};
-const write=m=>localStorage.setItem(KEY,JSON.stringify(m));
 const fmt=n=>'$'+(n||0).toLocaleString('es-CO');
+let me=null;
 
-const me=AUTH.currentUser();
-if(me) $('who').innerHTML=`Sesión: <b>${me.name}</b>`;
-$('btn-logout').onclick=()=>{AUTH.logout();location.href='index.html';};
+(async()=>{
+  await SAAS.ready;
+  if(!SAAS.guard()) return;
+  me=SAAS.user;
+  $('who').innerHTML = 'Sesión: <b>'+ (SAAS.currentName()||'') +'</b>';
+  const cloud=SAAS.configured;
+  $('chip-mode').textContent = cloud?'☁ Nube':'⚠ Local';
+  $('chip-mode').className='chip '+(cloud?'cloud':'local');
+  if(SAAS.isPro()){ $('chip-pro').style.display=''; }
+  $('foot').innerHTML = cloud
+    ? 'Tus proyectos se guardan en tu cuenta (Firestore) y se sincronizan en todos tus dispositivos.'
+    : '⚠ Modo local: los proyectos viven en este navegador. Configura Firebase (FIREBASE-SETUP.md) para SaaS real.';
+  render();
+})();
 
-function render(){
-  const m=read(), grid=$('grid'); grid.innerHTML='';
+$('btn-logout').onclick=async()=>{ await SAAS.logout(); location.href='index.html'; };
+
+async function render(){
+  const grid=$('grid'); grid.innerHTML='<div class="empty">Cargando…</div>';
+  const m=await SAAS.listProjects();
+  grid.innerHTML='';
   const keys=Object.keys(m).sort((a,b)=>(m[b].savedAt||'').localeCompare(m[a].savedAt||''));
   if(!keys.length){grid.innerHTML='<div class="empty">Sin proyectos aún — crea el primero con «Nuevo proyecto»</div>';return;}
   for(const k of keys){
     const p=m[k];
     const dirTot=(p.presupuesto&&p.presupuesto.totalDirecto)||0, indTot=(p.presupuesto&&p.presupuesto.totalIndirecto)||0;
-    const nActs=((p.actividadesIfc&&p.actividadesIfc.length)||0);
-    const nMats=((p.materiales&&p.materiales.length)||0);
+    const nActs=((p.actividadesIfc&&p.actividadesIfc.length)||0), nMats=((p.materiales&&p.materiales.length)||0);
     const modelo=(p.model&&p.model.fileName)||'sin modelo';
     const card=document.createElement('div'); card.className='card';
     card.innerHTML=`
       <div class="t">${p.nombre||k}</div>
-      <div class="pills">
-        <span class="pill">${nActs} actividades IFC</span>
-        <span class="pill ${nMats?'ok':'warn'}">${nMats} materiales</span>
-      </div>
+      <div class="pills"><span class="pill">${nActs} actividades IFC</span><span class="pill ${nMats?'ok':'warn'}">${nMats} materiales</span></div>
       <div class="m">Presupuesto: <b>${fmt(dirTot+indTot)}</b></div>
       <div class="m">Modelo: <b>${modelo}</b></div>
       <div class="m">Guardado: <b>${p.savedAt?new Date(p.savedAt).toLocaleString('es-CO'):'—'}</b></div>
       <div class="del" title="Eliminar proyecto">🗑 Eliminar</div>`;
-    card.onclick=e=>{
+    card.onclick=async e=>{
       if(e.target.classList.contains('del')){
         if(confirm(`¿Eliminar el proyecto "${p.nombre||k}"? Esta acción no se puede deshacer.`)){
-          const mm=read();delete mm[k];write(mm);
-          fetch('/api/delete-project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:k})}).catch(()=>{});
-          render();
+          await SAAS.deleteProject(k); render();
         }
         return;
       }
@@ -102,27 +114,13 @@ function render(){
   }
 }
 
-$('btn-nuevo').onclick=()=>{
+$('btn-nuevo').onclick=async()=>{
   const nombre=prompt('Nombre del proyecto (ej: Edificio San Fernando):');
   if(!nombre)return;
   const id=nombre.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')+'_'+Date.now().toString(36);
-  const m=read(); m[id]={nombre, savedAt:new Date().toISOString()}; write(m);
+  await SAAS.saveProject(id,{id,nombre,savedAt:new Date().toISOString()});
   location.href='presupuesto.html?id='+encodeURIComponent(id);
 };
-
-$('imp-json').onchange=e=>{
-  const f=e.target.files[0]; if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{try{
-    const p=JSON.parse(r.result);
-    if(!p||typeof p!=='object'||!p.nombre)throw new Error('no parece un proyecto de 5D Budgeting');
-    const id=p.id||('imp_'+Date.now().toString(36));
-    const m=read(); m[id]={...p,id}; write(m); render();
-  }catch(err){alert('No se pudo importar: '+err.message)}};
-  r.readAsText(f); e.target.value='';
-};
-
-render();
 </script>
 </body>
 </html>

@@ -5,9 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="firebase-config.js"></script>
 <script src="config.js"></script>
 <script src="auth.js"></script>
-<script>if(window.AUTH && !(window.APP_CONFIG&&APP_CONFIG.edition==='desktop'))AUTH.guard();</script>
+<script src="saas.js"></script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -580,9 +581,22 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 
 /* ================= ESTADO ================= */
 const $=id=>document.getElementById(id);
-const KEY=(window.AUTH&&AUTH.current())?AUTH.projectsKey():'budgeting5d_projects';
 const QS=new URLSearchParams(location.search);
 const PID=QS.get('id')||('proyecto_'+Date.now().toString(36));
+const DESKTOP=!!(window.APP_CONFIG&&APP_CONFIG.edition==='desktop');
+let KEY='budgeting5d_projects';
+/* Boot SaaS: autenticación + trae el proyecto de la nube (si Firebase está configurado) */
+if(DESKTOP){
+ KEY='budgeting5d_projects';
+}else if(window.SAAS){
+ try{
+  await SAAS.ready;
+  if(!SAAS.guard()){ throw new Error('redir'); }
+  KEY=SAAS.projectsCacheKey();
+  const cloud=await SAAS.getProject(PID);
+  if(cloud){ const m=JSON.parse(localStorage.getItem(KEY)||'{}'); m[PID]=cloud; localStorage.setItem(KEY,JSON.stringify(m)); }
+ }catch(e){ if(String(e&&e.message)==='redir'){ /* redirigiendo a login */ } }
+}
 const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
 const hoy=()=>new Date().toISOString().slice(0,10);
 
@@ -649,8 +663,9 @@ function save(showFlash){
  P.savedAt=new Date().toISOString();
  const all=JSON.parse(localStorage.getItem(KEY)||'{}');
  all[PID]=P; localStorage.setItem(KEY,JSON.stringify(all));
- fetch('/api/save-project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:PID,data:P})}).catch(()=>{});
- if(showFlash)flash('Proyecto guardado ✓ (navegador + webapp/proyectos/'+PID+'.json)');
+ if(window.SAAS && SAAS.saveProject){ SAAS.saveProject(PID,P); }         // sincroniza a la nube (Firestore) si está configurado
+ else { fetch('/api/save-project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:PID,data:P})}).catch(()=>{}); }
+ if(showFlash)flash(window.SAAS&&SAAS.configured?'Proyecto guardado ✓ (en tu cuenta / nube)':'Proyecto guardado ✓');
 }
 function autosave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>save(false),1500);}
 function flash(msg,ms=2600){const f=$('flash');f.textContent=msg;f.style.display='block';clearTimeout(f._t);f._t=setTimeout(()=>f.style.display='none',ms);}
@@ -1699,8 +1714,8 @@ $('btn-smtp').onclick=async()=>{
 let APUBASE=null, APUSRC='';
 const cfUrl=()=> (P.config.cfUrl||'').replace(/\/$/,'');
 /* ---- Base APU propia (tu ciudad), persistida por usuario ---- */
-function isPro(){ return !!(window.APP_CONFIG&&APP_CONFIG.pro) || localStorage.getItem('budgeting5d_pro')==='1'; }
-function apuOwnKey(){ return 'budgeting5d_apubase__'+((window.AUTH&&AUTH.current())||'local'); }
+function isPro(){ if(window.SAAS&&SAAS.isPro)return SAAS.isPro(); return !!(window.APP_CONFIG&&APP_CONFIG.pro) || localStorage.getItem('budgeting5d_pro')==='1'; }
+function apuOwnKey(){ return 'budgeting5d_apubase__'+((window.SAAS&&SAAS.uid)||(window.AUTH&&AUTH.current())||'local'); }
 function loadOwnApuBase(){ try{const v=JSON.parse(localStorage.getItem(apuOwnKey())||'null'); if(Array.isArray(v)&&v.length)return v;}catch(e){} return null; }
 function saveOwnApuBase(arr){ localStorage.setItem(apuOwnKey(),JSON.stringify(arr)); }
 function clearOwnApuBase(){ localStorage.removeItem(apuOwnKey()); }
@@ -2791,12 +2806,13 @@ function download(content,name,mime){
 }
 $('btn-save').onclick=()=>save(true);
 $('btn-export-json').onclick=()=>download(JSON.stringify(P,null,1),PID+'_cotizador.json','application/json');
-$('btn-delete').onclick=()=>{
+$('btn-delete').onclick=async()=>{
  if(!confirm(`¿Eliminar el proyecto "${P.nombre}"? Esta acción no se puede deshacer.`))return;
- const all=JSON.parse(localStorage.getItem(KEY)||'{}'); delete all[PID]; localStorage.setItem(KEY,JSON.stringify(all));
  window.removeEventListener('beforeunload',beforeUnload);
+ if(window.SAAS&&SAAS.deleteProject){ try{await SAAS.deleteProject(PID);}catch(e){} location.href='dashboard.html'; return; }
+ const all=JSON.parse(localStorage.getItem(KEY)||'{}'); delete all[PID]; localStorage.setItem(KEY,JSON.stringify(all));
  fetch('/api/delete-project',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:PID})})
-  .catch(()=>{}).finally(()=>{location.href='index.html';});
+  .catch(()=>{}).finally(()=>{location.href='dashboard.html';});
 };
 function beforeUnload(){save(false);}
 window.addEventListener('beforeunload',beforeUnload);

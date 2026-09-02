@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Cada usuario solo puede leer/escribir SUS propios datos.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // MODO INICIAL (activación por confianza): el usuario puede escribir su
+      // propio documento, incluido "pro". Sencillo para arrancar.
+      allow write: if request.auth != null && request.auth.uid == uid;
+
+      // ---- MODO PRODUCCIÓN (recomendado cuando conectes el webhook de Wompi) ----
+      // Reemplaza el "allow write" de arriba por estas dos reglas para que el
+      // usuario NO pueda auto-otorgarse Pro; solo la Cloud Function (admin) fija "pro":
+      //
+      // allow create: if request.auth != null && request.auth.uid == uid
+      //               && !("pro" in request.resource.data && request.resource.data.pro == true);
+      // allow update: if request.auth != null && request.auth.uid == uid
+      //               && request.resource.data.pro == resource.data.pro;   // no cambia "pro"
+      // (La Cloud Function usa Admin SDK y se salta estas reglas.)
+
+      // Subcolecciones del usuario: proyectos y metadatos (base APU propia, etc.)
+      match /{sub}/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+  }
+}
