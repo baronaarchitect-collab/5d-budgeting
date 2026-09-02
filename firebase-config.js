@@ -1,16 +1,14 @@
 /* ============================================================
-   CONFIG DE FIREBASE  —  PEGA AQUÍ la de TU proyecto.
-   Firebase Console → ⚙ Configuración del proyecto → "Tus apps"
-   → app Web → SDK setup and configuration → Config.
+   CONFIG DE FIREBASE  —  proyecto "d-budgeting-18a11".
    (Estos valores son públicos por diseño; la seguridad la dan
     las Reglas de Firestore, ver firestore.rules)
-   Mientras tengan "PEGA_…", la app funciona en modo LOCAL.
    ============================================================ */
 window.FIREBASE_CONFIG = {
-  apiKey: "PEGA_TU_API_KEY",
-  authDomain: "PEGA_TU_PROYECTO.firebaseapp.com",
-  projectId: "PEGA_TU_PROYECTO",
-  storageBucket: "PEGA_TU_PROYECTO.appspot.com",
-  messagingSenderId: "PEGA_TU_SENDER_ID",
-  appId: "PEGA_TU_APP_ID"
+  apiKey: "AIzaSyD5TuZd4PJBa9-nkpJ9BB9IHmdTlvOvtV8",
+  authDomain: "d-budgeting-18a11.firebaseapp.com",
+  projectId: "d-budgeting-18a11",
+  storageBucket: "d-budgeting-18a11.firebasestorage.app",
+  messagingSenderId: "1002904337776",
+  appId: "1:1002904337776:web:55d0dee758e5df3d6663b5",
+  measurementId: "G-XQ9BVWYETT"
 };
