@@ -107,7 +107,12 @@ $('form-login').onsubmit=async e=>{
 };
 $('form-signup').onsubmit=async e=>{
   e.preventDefault();
-  try{ msg('Creando cuenta…'); await SAAS.signupEmail($('su-email').value,$('su-name').value,$('su-pass').value); location.href=NEXT; }
+  try{
+    msg('Creando cuenta…');
+    await SAAS.signupEmail($('su-email').value,$('su-name').value,$('su-pass').value);
+    // cuenta nueva → guía de bienvenida (salvo que venga de un enlace concreto)
+    location.href = QS.get('next') ? NEXT : 'bienvenida.html';
+  }
   catch(err){ msg(traducir(err),'err'); }
 };
 $('btn-google').onclick=async()=>{
