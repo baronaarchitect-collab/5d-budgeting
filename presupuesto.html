@@ -90,6 +90,16 @@
   .modal{position:fixed;inset:0;background:rgba(5,8,13,.82);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:900}
   .modal.on{display:flex}
   #modal-wa{z-index:960}
+  /* --- árbol del presupuesto: Categoría IFC > Actividad > Ejemplar --- */
+  .tw{cursor:pointer;user-select:none;display:inline-block;width:12px}
+  tr.lvl-cat td{background:var(--bg-2);border-top:1px solid var(--line);cursor:pointer;letter-spacing:.5px;font-size:11px}
+  tr.lvl-cat td b{color:var(--accent-3);text-transform:uppercase}
+  tr.lvl-cat .tw{color:var(--accent-3);font-weight:700}
+  tr.lvl-act>td:first-child{padding-left:14px}
+  tr.lvl-act .actcell{display:flex;align-items:center;gap:6px}
+  tr.lvl-act .ej-toggle{color:var(--viol);font-weight:700;flex:none}
+  tr.lvl-ej td{background:rgba(255,255,255,.02);font-size:10px;color:var(--text-dim);border-top:1px dotted var(--line)}
+  tr.lvl-ej td.ej{padding-left:40px;color:var(--text)}
   .modal .box2{background:var(--bg-1);border:1px solid var(--line);width:min(860px,94vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.6)}
   .modal .mh{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line)}
   .modal .mh h3{font-family:var(--display);font-size:14px;font-weight:600}
@@ -1305,11 +1315,19 @@ const UNIDADES=['un','m2','ml','m3','kg','gl','vje','hc','dia'];
 $('btn-items-modelo').onclick=()=>{
  const tipos=P.model.tipos||{};
  if(Object.keys(tipos).length){
+  // ejemplares (instancias) por tipo, para el 3er nivel del árbol
+  const ejem={};
+  for(const id in IFC_ELEMS){
+   const e=IFC_ELEMS[id]; if(!e)continue;
+   (ejem[e.tipo]=ejem[e.tipo]||[]).push({i:id,a:(e.q&&e.q.m2)||0,l:(e.q&&e.q.ml)||0,v:(e.q&&e.q.m3)||0});
+  }
   // una fila por TIPO de Revit — el APU se asigna al tipo
   for(const [tipo,t] of Object.entries(tipos)){
    if(P.presupuesto.items.some(it=>it.desc===tipo))continue;
+   const evs=ejem[tipo]||[];
    P.presupuesto.items.push({desc:tipo,cat:t.cat,unidad:'un',qty:t.un,
-    qtyAuto:{un:t.un,m2:t.m2,ml:t.ml,m3:t.m3},apuNombre:'',valor:0});
+    qtyAuto:{un:t.un,m2:t.m2,ml:t.ml,m3:t.m3},apuNombre:'',valor:0,
+    elems:evs.slice(0,150),nElems:evs.length});
   }
   renderItems(); autosave();
   flash('Ítems generados por TIPO de Revit — elige la unidad (un/m²/ml/m³) y la cantidad se toma del IFC; enlaza el APU con ⊕');
@@ -1328,50 +1346,106 @@ $('btn-items-modelo').onclick=()=>{
 $('btn-item-add').onclick=()=>{P.presupuesto.items.push({desc:'',unidad:'un',qty:1,qtyAuto:null,apuNombre:'',valor:0});renderItems();autosave();};
 
 function itemTotal(it){return (parseFloat(it.qty)||0)*(parseFloat(it.valor)||0);}
+/* estado de plegado del árbol (sesión): categorías abiertas, ejemplares cerrados */
+const TREE={cat:{},act:{}};
+/* ejemplares (instancias) de una actividad: del IFC de la sesión, o los persistidos */
+function ejemplaresDe(it){
+ const live=[];
+ for(const id in IFC_ELEMS){
+  const e=IFC_ELEMS[id];
+  if(e&&e.tipo===it.desc)live.push({i:id,a:(e.q&&e.q.m2)||0,l:(e.q&&e.q.ml)||0,v:(e.q&&e.q.m3)||0});
+ }
+ if(live.length)return {list:live,total:live.length};
+ const p=it.elems||[];
+ return {list:p,total:it.nElems||p.length};
+}
+function buildItemRow(it,onTot){
+ const tr=document.createElement('tr'); tr.className='lvl-act';
+ const bump=()=>{tr.children[5].textContent=fmt(itemTotal(it)); if(onTot)onTot(); renderPresStats(); autosave();};
+ const unOpts=UNIDADES.map(u=>`<option ${u===(it.unidad||'un')?'selected':''}>${u}</option>`).join('');
+ const qa=it.qtyAuto||{};
+ const ej=ejemplaresDe(it);
+ const eopen=!!TREE.act[it.desc];
+ const tog=ej.total?`<span class="tw ej-toggle" title="${ej.total} ejemplares">${eopen?'▾':'▸'}</span>`:'<span class="tw"></span>';
+ tr.innerHTML=`<td><div class="actcell">${tog}<input value="${(it.desc||'').replace(/"/g,'&quot;')}"></div></td>
+  <td><select style="width:60px" title="un=${qa.un??'—'} · m2=${qa.m2??'—'} · ml=${qa.ml??'—'} · m3=${qa.m3??'—'}">${unOpts}</select></td>
+  <td><input class="num" type="number" step="any" value="${it.qty??''}" style="width:84px"></td>
+  <td><span class="apu-link">${it.apuNombre||it.apu||'⊕ buscar APU…'}</span>${it.apuUnidadApu?` <span class="hint">(${it.apuUnidadApu})</span>`:''}${it.apuId?' <span class="apu-edit" title="Editar APU (se guarda como NUEVO en Cloudflare)" style="cursor:pointer;color:var(--accent-3)">✎</span>':''}</td>
+  <td><input class="num" type="number" value="${it.valor??''}"></td>
+  <td style="text-align:right;color:var(--accent)">${fmt(itemTotal(it))}</td>
+  <td class="del">✕</td>`;
+ const [iDesc,iQty,iVal]=[...tr.querySelectorAll('input')];
+ const sUnd=tr.querySelector('select');
+ iDesc.oninput=()=>{it.desc=iDesc.value;autosave();};
+ sUnd.onchange=()=>{
+  it.unidad=sUnd.value;
+  if(it.qtyAuto&&it.qtyAuto[it.unidad]>0){it.qty=it.qtyAuto[it.unidad];iQty.value=it.qty;}
+  bump();
+ };
+ iQty.oninput=()=>{it.qty=parseFloat(iQty.value)||0;bump();};
+ iVal.oninput=()=>{it.valor=parseFloat(iVal.value)||0;bump();};
+ const aplicarUnidadApuItem=()=>{
+  const k=unidadKey(it.apuUnidadApu);
+  if(k){it.unidad=k;if(it.qtyAuto&&it.qtyAuto[k]>0)it.qty=it.qtyAuto[k];}
+ };
+ tr.querySelector('.apu-link').onclick=()=>openApuPicker(sel=>{
+  it.apuId=sel.id;it.apuNombre=sel.nombre;it.apuUnidadApu=sel.unidad;it.valor=sel.precio;
+  aplicarUnidadApuItem(); renderItems();autosave();
+ });
+ const edI=tr.querySelector('.apu-edit');
+ if(edI)edI.onclick=()=>openApuEdit({id:it.apuId,nombre:it.apuNombre,unidad:it.apuUnidadApu,precio:it.valor},nuevo=>{
+  it.apuId=nuevo.id;it.apuNombre=nuevo.nombre;if(nuevo.unidad)it.apuUnidadApu=nuevo.unidad;it.valor=nuevo.precio;
+  aplicarUnidadApuItem(); renderItems();autosave();
+ });
+ const tg=tr.querySelector('.ej-toggle');
+ if(tg)tg.onclick=()=>{TREE.act[it.desc]=!eopen;renderItems();};
+ tr.querySelector('.del').onclick=()=>{
+  const idx=P.presupuesto.items.indexOf(it);
+  if(idx>=0)P.presupuesto.items.splice(idx,1);
+  renderItems();autosave();
+ };
+ return tr;
+}
 function renderItems(){
  const tb=$('tbl-items').querySelector('tbody'); tb.innerHTML='';
- P.presupuesto.items.forEach((it,i)=>{
-  const tr=document.createElement('tr');
-  const unOpts=UNIDADES.map(u=>`<option ${u===(it.unidad||'un')?'selected':''}>${u}</option>`).join('');
-  const qa=it.qtyAuto||{};
-  tr.innerHTML=`<td><input value="${(it.desc||'').replace(/"/g,'&quot;')}"></td>
-   <td><select style="width:60px" title="un=${qa.un??'—'} · m2=${qa.m2??'—'} · ml=${qa.ml??'—'} · m3=${qa.m3??'—'}">${unOpts}</select></td>
-   <td><input class="num" type="number" step="any" value="${it.qty??''}" style="width:84px"></td>
-   <td><span class="apu-link">${it.apuNombre||it.apu||'⊕ buscar APU…'}</span>${it.apuUnidadApu?` <span class="hint">(${it.apuUnidadApu})</span>`:''}${it.apuId?' <span class="apu-edit" title="Editar APU (se guarda como NUEVO en Cloudflare)" style="cursor:pointer;color:var(--accent-3)">✎</span>':''}</td>
-   <td><input class="num" type="number" value="${it.valor??''}"></td>
-   <td style="text-align:right;color:var(--accent)">${fmt(itemTotal(it))}</td>
-   <td class="del">✕</td>`;
-  const [iDesc,iQty,iVal]=[...tr.querySelectorAll('input')];
-  const sUnd=tr.querySelector('select');
-  iDesc.oninput=()=>{it.desc=iDesc.value;autosave();};
-  sUnd.onchange=()=>{
-   it.unidad=sUnd.value;
-   // al cambiar la unidad, la cantidad se toma del IFC para ese tipo de medida
-   if(it.qtyAuto&&it.qtyAuto[it.unidad]>0){it.qty=it.qtyAuto[it.unidad];iQty.value=it.qty;}
-   tr.children[5].textContent=fmt(itemTotal(it));renderPresStats();autosave();
-  };
-  iQty.oninput=()=>{it.qty=parseFloat(iQty.value)||0;tr.children[5].textContent=fmt(itemTotal(it));renderPresStats();autosave();};
-  iVal.oninput=()=>{it.valor=parseFloat(iVal.value)||0;tr.children[5].textContent=fmt(itemTotal(it));renderPresStats();autosave();};
-  const aplicarUnidadApuItem=()=>{
-   // la unidad del ítem salta a la del APU y la cantidad se toma del IFC (m2=área, ml=longitud, m3=volumen, un=conteo)
-   const k=unidadKey(it.apuUnidadApu);
-   if(k){it.unidad=k;if(it.qtyAuto&&it.qtyAuto[k]>0)it.qty=it.qtyAuto[k];}
-  };
-  tr.querySelector('.apu-link').onclick=()=>openApuPicker(sel=>{
-   it.apuId=sel.id;it.apuNombre=sel.nombre;it.apuUnidadApu=sel.unidad;it.valor=sel.precio;
-   aplicarUnidadApuItem();
-   renderItems();autosave();
+ const items=P.presupuesto.items;
+ if(!items.length){
+  tb.innerHTML='<tr><td colspan="7" class="hint" style="font-style:italic;padding:10px">«Generar ítems desde el modelo» agrupa el presupuesto en <b>Categoría IFC → Actividad → Ejemplar</b>; a cada actividad se le enlaza su APU.</td></tr>';
+  renderInd(); renderPresStats(); return;
+ }
+ // NIVEL 1: categoría IFC
+ const groups=new Map();
+ items.forEach(it=>{const c=it.cat||'Otros / manual'; if(!groups.has(c))groups.set(c,[]); groups.get(c).push(it);});
+ [...groups.keys()].sort((a,b)=>a.localeCompare(b)).forEach(cat=>{
+  const list=groups.get(cat);
+  const sub=list.reduce((s,x)=>s+itemTotal(x),0);
+  const open=TREE.cat[cat]!==false;
+  const trc=document.createElement('tr'); trc.className='lvl-cat';
+  trc.innerHTML=`<td colspan="5"><span class="tw">${open?'▾':'▸'}</span> <b>${cat}</b> <span class="hint">· ${list.length} actividad${list.length===1?'':'es'}</span></td>
+   <td style="text-align:right;color:var(--accent);font-weight:600">${fmt(sub)}</td><td></td>`;
+  trc.onclick=()=>{TREE.cat[cat]=!open;renderItems();};
+  tb.appendChild(trc);
+  if(!open)return;
+  // NIVEL 2: actividad (tipo de Revit)
+  const updSub=()=>{trc.children[1].textContent=fmt(list.reduce((s,x)=>s+itemTotal(x),0));};
+  list.forEach(it=>{
+   tb.appendChild(buildItemRow(it,updSub));
+   // NIVEL 3: ejemplares (instancias)
+   if(!TREE.act[it.desc])return;
+   const ej=ejemplaresDe(it);
+   ej.list.forEach(e=>{
+    const dims=[e.a?e.a+' m²':'',e.l?e.l+' ml':'',e.v?e.v+' m³':''].filter(Boolean).join(' · ')||'—';
+    const tre=document.createElement('tr'); tre.className='lvl-ej';
+    tre.innerHTML=`<td class="ej">↳ ejemplar #${e.i}</td><td>un</td><td>1</td><td colspan="2">${dims}</td><td></td><td></td>`;
+    tb.appendChild(tre);
+   });
+   if(ej.total>ej.list.length){
+    const tm=document.createElement('tr'); tm.className='lvl-ej';
+    tm.innerHTML=`<td class="ej" colspan="7">… y ${ej.total-ej.list.length} ejemplares más</td>`;
+    tb.appendChild(tm);
+   }
   });
-  const edI=tr.querySelector('.apu-edit');
-  if(edI)edI.onclick=()=>openApuEdit({id:it.apuId,nombre:it.apuNombre,unidad:it.apuUnidadApu,precio:it.valor},nuevo=>{
-   it.apuId=nuevo.id;it.apuNombre=nuevo.nombre;if(nuevo.unidad)it.apuUnidadApu=nuevo.unidad;it.valor=nuevo.precio;
-   aplicarUnidadApuItem();
-   renderItems();autosave();
-  });
-  tr.querySelector('.del').onclick=()=>{P.presupuesto.items.splice(i,1);renderItems();autosave();};
-  tb.appendChild(tr);
  });
- if(!P.presupuesto.items.length)tb.innerHTML='<tr><td colspan="7" class="hint" style="font-style:italic;padding:10px">«Generar ítems desde el modelo» crea una fila por cada TIPO de Revit del IFC; a cada tipo se le enlaza su APU.</td></tr>';
  renderInd(); renderPresStats();
 }
 
