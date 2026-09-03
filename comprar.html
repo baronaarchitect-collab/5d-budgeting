@@ -48,10 +48,10 @@
   footer{border-top:1px solid var(--line);margin-top:50px;padding:22px 0;color:var(--text-dim);font-size:12px}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
-<script src="firebase-config.js"></script>
-<script src="config.js"></script>
-<script src="auth.js"></script>
-<script src="saas.js"></script>
+<script src="firebase-config.js?v=3"></script>
+<script src="config.js?v=3"></script>
+<script src="auth.js?v=3"></script>
+<script src="saas.js?v=3"></script>
 </head>
 <body>
 <nav><div class="wrap row">
@@ -89,14 +89,15 @@
         <li>Actualizaciones incluidas</li>
       </ul>
       <button class="btn primary lg" id="btn-pagar" style="width:100%;justify-content:center;margin-top:18px"><span>💳</span> Pagar con Wompi</button>
+      <p class="muted" id="pay-email" style="margin-top:10px"></p>
       <div class="flash" id="pay-flash"></div>
     </div>
   </div>
 
   <div class="box" id="box-descarga">
     <h3>⬇️ Descargar la versión de escritorio</h3>
-    <div class="step"><div class="n">1</div><div>Pulsa <b>Pagar con Nubank</b> y completa el pago.</div></div>
-    <div class="step"><div class="n">2</div><div>Vuelve aquí y activa la descarga (con tu código de activación, si aplica).</div></div>
+    <div class="step"><div class="n">1</div><div>Pulsa <b>Pagar con Wompi</b> y completa el pago <b>usando el correo de tu cuenta</b> (así se activa solo).</div></div>
+    <div class="step"><div class="n">2</div><div>Vuelve aquí y pulsa <b>«Ya pagué — verificar»</b>. Si el pago está confirmado, Pro se activa automáticamente.</div></div>
     <div class="step"><div class="n">3</div><div>Descomprime el ZIP y ejecuta <b>Iniciar 5D Budgeting.bat</b> (Windows) o <code>python serve.py</code>.</div></div>
 
     <div id="gate" style="margin-top:14px">
@@ -108,7 +109,8 @@
         </div>
       </div>
       <div id="gate-honor" style="display:none">
-        <button class="btn ok" id="btn-yapague"><span>✓</span> Ya pagué — activar y descargar</button>
+        <button class="btn ok" id="btn-verificar"><span>✓</span> Ya pagué — verificar</button>
+        <button class="btn" id="btn-yapague" style="margin-left:8px"><span>⏱</span> Activar manualmente</button>
       </div>
       <div class="flash" id="gate-flash"></div>
     </div>
@@ -124,7 +126,7 @@
     <p class="muted">El botón abre tu <b>link de pago de Wompi</b> (Bancolombia). Edita <code>comprar.html</code> (objeto <code>PAGO</code> arriba del script):</p>
     <div class="step"><div class="n">A</div><div>En tu panel de <b>Wompi → Links de pago</b>, crea un link para "5D Budgeting Pro" y pégalo en <code>PAGO.link</code> (ej: <code>https://checkout.wompi.co/l/XXXXX</code>).</div></div>
     <div class="step"><div class="n">B</div><div>Ajusta el precio mostrado en <code>PAGO.precioCOP</code> (la etiqueta; el cobro real lo define el link de Wompi).</div></div>
-    <div class="step"><div class="n">C</div><div><b>Activación automática (SaaS):</b> con Firebase configurado, al activar se marca <code>pro:true</code> en tu cuenta. Para que se active <b>solo tras el pago confirmado</b>, conecta el <b>webhook/eventos de Wompi</b> a una Cloud Function (ver <code>functions/index.js</code> y FIREBASE-SETUP.md).</div></div>
+    <div class="step"><div class="n">C</div><div><b>Activación automática (gratis):</b> conecta los <b>eventos de Wompi</b> a un <b>Google Apps Script</b> que marca <code>pro:true</code> en Firestore al confirmarse el pago. Paso a paso en <code>apps-script/README.md</code> (alternativa sin costo a Cloud Functions).</div></div>
     <div class="step"><div class="n">D</div><div><b>Código de activación (opcional):</b> define <code>ACCESS_CODE</code> para exigir un código que envías tras el pago. Vacío = activación por confianza (“Ya pagué”).</div></div>
     <p class="muted">Nota: sin el webhook, la activación es por confianza (del lado del navegador). El webhook de Wompi es lo que la vuelve verificada de verdad.</p>
   </div>
@@ -136,7 +138,7 @@
 /* ================== CONFIGURA AQUÍ TU COBRO (WOMPI) ==================
    Crea un "Link de pago" en tu panel de Wompi y pégalo abajo. */
 const PAGO = {
-  link:   'https://checkout.wompi.co/l/RMNKBv',   // link de pago Wompi (PRUEBA)
+  link:   'https://checkout.wompi.co/l/q7powt',   // link de pago Wompi (PRODUCCIÓN)
   precioCOP: 120000
 };
 const ACCESS_CODE = '';  // Déjalo vacío para activación por confianza; ponle un código para exigirlo.
@@ -167,6 +169,17 @@ $('btn-pagar').onclick=()=>{
   }
 };
 
+$('btn-verificar') && ($('btn-verificar').onclick=async()=>{
+  const g=$('gate-flash');
+  g.innerHTML='Verificando tu pago…';
+  try{
+    await SAAS.ready;
+    if(!SAAS.configured){ g.innerHTML='<b style="color:var(--accent)">Sin Firebase configurado</b> — usa «Activar manualmente».'; return; }
+    await SAAS.refreshProfile();
+    if(SAAS.isPro()){ unlock(); return; }
+    g.innerHTML='<b style="color:var(--accent)">Aún no vemos el pago confirmado.</b> Espera ~1 minuto y vuelve a pulsar. Si pagaste con otro correo, escríbenos y lo activamos.';
+  }catch(e){ g.innerHTML='<b style="color:var(--accent-2)">No se pudo verificar: '+(e.message||e)+'</b>'; }
+});
 $('btn-code') && ($('btn-code').onclick=()=>{
   if(($('code').value||'').trim()===ACCESS_CODE && ACCESS_CODE){ unlock(); }
   else { $('gate-flash').innerHTML='<b style="color:var(--accent-2)">Código incorrecto.</b>'; }
@@ -174,7 +187,19 @@ $('btn-code') && ($('btn-code').onclick=()=>{
 $('btn-yapague') && ($('btn-yapague').onclick=unlock);
 
 // si ya es Pro en su cuenta/navegador, muestra la descarga directo
-(async()=>{ try{ if(window.SAAS){ await SAAS.ready; if(SAAS.isPro()){ revealGate(); unlock(); } } else if(localStorage.getItem('budgeting5d_pro')==='1'){ revealGate(); unlock(); } }catch(e){} })();
+(async()=>{
+  try{
+    if(window.SAAS){
+      await SAAS.ready;
+      // muestra con qué correo debe pagar para que se active solo
+      const em = SAAS.user && SAAS.user.email;
+      if(em) $('pay-email').innerHTML = '💡 Paga usando este correo para que Pro se active automáticamente: <b style="color:var(--accent)">'+em+'</b>';
+      else $('pay-email').innerHTML = '💡 <a href="login.html">Inicia sesión</a> antes de pagar para que Pro se active automáticamente en tu cuenta.';
+      await SAAS.refreshProfile();
+      if(SAAS.isPro()){ revealGate(); unlock(); }
+    } else if(localStorage.getItem('budgeting5d_pro')==='1'){ revealGate(); unlock(); }
+  }catch(e){}
+})();
 </script>
 </body>
 </html>

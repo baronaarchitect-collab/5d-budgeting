@@ -68,8 +68,19 @@ window.SAAS = (function () {
     get user() { return state.user; },
     currentName() { return state.user ? (state.user.displayName || (state.profile && state.profile.name) || state.user.email || '') : ''; },
 
+    // Re-lee el perfil desde Firestore (para ver si el webhook ya activó Pro)
+    async refreshProfile() {
+      if (state.mode !== 'firebase' || !state.user) return null;
+      try {
+        const snap = await F.getDoc(F.doc(db, 'users', state.user.uid));
+        state.profile = snap.exists() ? snap.data() : state.profile;
+        return state.profile;
+      } catch (e) { return null; }
+    },
+
     isPro() {
-      if (state.mode === 'firebase') return !!(state.profile && state.profile.pro) || localStorage.getItem('budgeting5d_pro') === '1';
+      // En la nube la VERDAD es Firestore (lo escribe el webhook de Wompi tras el pago).
+      if (state.mode === 'firebase') return !!(state.profile && state.profile.pro);
       return !!(window.APP_CONFIG && APP_CONFIG.pro) || localStorage.getItem('budgeting5d_pro') === '1';
     },
     async setPro(v) {
