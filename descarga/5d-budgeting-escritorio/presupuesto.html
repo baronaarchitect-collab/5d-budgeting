@@ -137,7 +137,10 @@
     <div class="mb">
       <p class="hint" id="wa-material" style="margin-bottom:8px"></p>
       <div class="ctl"><label>Mensaje</label><textarea id="wa-msg" style="min-height:120px"></textarea></div>
-      <p class="hint" style="margin:10px 0 4px">Enviar a (abre tu WhatsApp con el mensaje listo):</p>
+      <div class="ctl" style="max-width:260px;margin:10px 0 4px"><label>Ciudad del proveedor</label>
+        <select id="wa-ciudad" class="inp"></select>
+      </div>
+      <p class="hint" style="margin:6px 0 4px">Enviar a (abre tu WhatsApp con el mensaje listo):</p>
       <div class="btnrow" id="wa-btns"></div>
       <button class="btn sm" id="wa-add" style="margin-top:8px"><span class="ic">+</span> Agregar ferretería</button>
     </div>
@@ -157,9 +160,9 @@
       </table></div>
       <div class="btnrow" style="margin-top:10px;align-items:center">
         <button class="btn sm" id="apuedit-add"><span class="ic">+</span> Insumo</button>
-        <button class="btn sm ok" id="apuedit-cotizar" title="Mandar a cotizar TODOS los insumos de este APU en un solo mensaje (excluye mano de obra)"><span class="ic">✆</span> Cotizar APU completo</button>
+        <button class="btn sm ok" id="apuedit-cotizar" title="Mandar a cotizar TODOS los insumos de este APU en un solo mensaje (excluye mano de obra)"><span class="ic">✆</span> Cotizar APU completo<span class="pill" style="background:rgba(156,107,255,.18);color:var(--viol);margin-left:6px;font-size:8px">PRO</span></button>
         <span class="hint" style="flex:1">Total del APU: <b id="apuedit-total" style="color:var(--accent);font-size:13px">$0</b></span>
-        <button class="btn primary" id="apuedit-save"><span class="ic">☁</span> Guardar como nuevo APU y usarlo</button>
+        <button class="btn primary" id="apuedit-save"><span class="ic">☁</span> Guardar como nuevo APU y usarlo<span class="pill" style="background:rgba(156,107,255,.18);color:var(--viol);margin-left:6px;font-size:8px">PRO</span></button>
       </div>
       <p class="hint" id="apuedit-out">El APU original de la base no se modifica: los cambios se guardan como un APU nuevo en Cloudflare (también al cerrar, si confirmas).</p>
     </div>
@@ -464,7 +467,7 @@
       <h3><span class="dot"></span> 1 · Mandar a cotizar los materiales</h3>
       <p class="hint">Cotiza <b>todo el proyecto</b> en un solo mensaje, o por especialidad. Se abre el mensaje listo para enviar por WhatsApp a tus ferreterías, por correo (mailto) o copiarlo. La mano de obra se excluye.</p>
       <div class="btnrow" style="margin-bottom:8px">
-        <button class="btn ok" id="btn-mat-cotizar-todo"><span class="ic">✆</span> Cotizar TODO el proyecto de materiales</button>
+        <button class="btn ok" id="btn-mat-cotizar-todo"><span class="ic">✆</span> Cotizar TODO el proyecto de materiales<span class="pill" style="background:rgba(156,107,255,.18);color:var(--viol);margin-left:6px;font-size:8px">PRO</span></button>
       </div>
       <p class="hint" style="margin:2px 0 4px">…o por especialidad (borrador de correo):</p>
       <div class="btnrow" id="btn-esp-row">
@@ -498,10 +501,15 @@
     <div class="btnrow" style="align-items:flex-end;flex-wrap:wrap">
       <div class="ctl" style="min-width:200px"><label>Nombre / ferretería</label><input id="prov-dir-nombre" class="inp" placeholder="Ej: Ferretería El Ingenio"></div>
       <div class="ctl" style="min-width:180px"><label>WhatsApp</label><input id="prov-dir-tel" class="inp" placeholder="3001234567 o 573001234567"></div>
+      <div class="ctl" style="min-width:150px"><label>Ciudad</label><select id="prov-dir-ciudad" class="inp"></select></div>
       <button class="btn sm primary" id="prov-dir-add" style="align-self:flex-end"><span class="ic">+</span> Agregar proveedor</button>
     </div>
+    <div class="btnrow" style="align-items:flex-end;flex-wrap:wrap;margin-top:2px">
+      <div class="ctl" style="min-width:180px"><label>Filtrar por ciudad</label><select id="prov-dir-filtro" class="inp"></select></div>
+      <button class="btn sm viol" id="prov-dir-seed" style="align-self:flex-end"><span class="ic">⇩</span> Cargar proveedores de las 5 ciudades</button>
+    </div>
     <div style="overflow-x:auto"><table class="tbl" id="tbl-prov-dir">
-      <thead><tr><th style="width:38%">Proveedor</th><th>WhatsApp</th><th style="width:120px">Cotizar</th><th style="width:80px"></th></tr></thead>
+      <thead><tr><th style="width:32%">Proveedor</th><th style="width:22%">Ciudad</th><th>WhatsApp</th><th style="width:110px">Cotizar</th><th style="width:70px"></th></tr></thead>
       <tbody></tbody>
     </table></div>
     <p class="hint">Estos proveedores se usan en los botones de cotización por WhatsApp (en APU, materiales y en el comparativo de Presupuesto) y en la lista de proveedores a comparar. Se guardan en este navegador y quedan disponibles en todos los proyectos.</p>
@@ -599,13 +607,20 @@ let KEY='budgeting5d_projects';
 if(DESKTOP){
  KEY='budgeting5d_projects';
 }else if(window.SAAS){
+ try{ await SAAS.ready; }catch(e){}
+ if(!SAAS.uid){
+  // sin sesión: al login y DETENER el módulo (si no, la página queda a medio render)
+  const _u='login.html?next='+encodeURIComponent('presupuesto.html'+location.search);
+  try{ document.body.innerHTML='<div style="min-height:60vh;display:flex;align-items:center;justify-content:center;color:#8b97aa;font-family:monospace">Redirigiendo al inicio de sesión…</div>'; }catch(e){}
+  location.replace(_u);
+  setTimeout(()=>{ if(!/login\.html/.test(location.pathname)) location.href=_u; },400);
+  await new Promise(()=>{});
+ }
+ KEY=SAAS.projectsCacheKey();
  try{
-  await SAAS.ready;
-  if(!SAAS.guard()){ throw new Error('redir'); }
-  KEY=SAAS.projectsCacheKey();
   const cloud=await SAAS.getProject(PID);
   if(cloud){ const m=JSON.parse(localStorage.getItem(KEY)||'{}'); m[PID]=cloud; localStorage.setItem(KEY,JSON.stringify(m)); }
- }catch(e){ if(String(e&&e.message)==='redir'){ /* redirigiendo a login */ } }
+ }catch(e){}
 }
 const fmt=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
 const hoy=()=>new Date().toISOString().slice(0,10);
@@ -1826,9 +1841,9 @@ function renderApuOwnInfo(){
   ? `<b style="color:var(--viol)">✓ Usando tu base propia</b> — ${own.length} APUs (${own.filter(a=>a.insumos&&a.insumos.length).length} con insumos). Pulsa «Volver a la base de la nube» para desactivarla.`
   : 'Aún no has subido tu base propia — al subirla, la app la usará como fuente principal.';
 }
-function proGuard(){ if(!isPro()){ if(confirm('Subir tu propia base de APUs es una función de la versión de pago (escritorio). ¿Ver la versión de pago / descargar?'))location.href='comprar.html'; return false;} return true; }
+function proGuard(feature){ if(!isPro()){ if(confirm((feature||'Esta función')+' es una función PRO. ¿Quieres activar Pro ahora?'))location.href='comprar.html'; return false;} return true; }
 function reloadApuBaseAfterImport(){ APU_INS_CACHE&&Object.keys(APU_INS_CACHE).forEach(k=>delete APU_INS_CACHE[k]); loadApuBase(); }
-$('btn-apu-own-clear').onclick=()=>{ if(!proGuard())return; clearOwnApuBase(); reloadApuBaseAfterImport(); flash('Base propia desactivada — se vuelve a la base de la nube/local'); };
+$('btn-apu-own-clear').onclick=()=>{ if(!proGuard('Gestionar tu base de APUs'))return; clearOwnApuBase(); reloadApuBaseAfterImport(); flash('Base propia desactivada — se vuelve a la base de la nube/local'); };
 $('btn-apu-own-tpl').onclick=()=>{
  const csv=[
   'Actividad,Unidad,Insumo,Codigo,Tipo,Unidad Insumo,Rendimiento,Desperdicio,Precio Unitario',
@@ -1841,7 +1856,7 @@ $('btn-apu-own-tpl').onclick=()=>{
  flash('Plantilla CSV descargada — una fila por insumo, la Actividad se repite. Súbela con «Convertir e importar».');
 };
 $('file-apu-own').onchange=e=>{
- const f=e.target.files[0]; if(!f){return;} if(!proGuard()){e.target.value='';return;}
+ const f=e.target.files[0]; if(!f){return;} if(!proGuard('Subir tu base de datos de APUs')){e.target.value='';return;}
  const r=new FileReader();
  r.onload=()=>{ try{
    const arr=JSON.parse(r.result);
@@ -1859,7 +1874,7 @@ $('file-apu-own').onchange=e=>{
  r.readAsText(f); e.target.value='';
 };
 $('file-apu-own-xls').onchange=e=>{
- const f=e.target.files[0]; if(!f){return;} if(!proGuard()){e.target.value='';return;}
+ const f=e.target.files[0]; if(!f){return;} if(!proGuard('Subir tu base de datos de APUs')){e.target.value='';return;}
  const r=new FileReader();
  r.onload=()=>{ try{
    const wb=XLSX.read(r.result,{type:'binary'});
@@ -1977,7 +1992,7 @@ function finalizarApus(apus){
  return apus;
 }
 $('file-apu-convert').onchange=async e=>{
- const f=e.target.files[0]; if(!f){return;} if(!proGuard()){e.target.value='';return;}
+ const f=e.target.files[0]; if(!f){return;} if(!proGuard('Subir tu base de datos de APUs')){e.target.value='';return;}
  try{
   let apus=[];
   if(/\.pdf$/i.test(f.name)){
@@ -1999,7 +2014,7 @@ $('file-apu-convert').onchange=async e=>{
  e.target.value='';
 };
 $('btn-apu-cloud-push').onclick=async()=>{
- if(!proGuard())return;
+ if(!proGuard('Subir tu base de datos de APUs a la nube'))return;
  const out=$('apu-cloud-out');
  const own=loadOwnApuBase();
  if(!own||!own.length){out.innerHTML='<b style="color:var(--accent)">Primero convierte/carga tu base propia (Excel/PDF/JSON).</b>';return;}
@@ -2081,17 +2096,28 @@ $('apu-search').oninput=()=>{clearTimeout(apuT);apuT=setTimeout(async()=>{
 
 /* ---- cotizar un material por WhatsApp (ferreterías guardadas) ---- */
 const FERRE_KEY='cotizador_ferreterias_wa';
+const CIUDADES=['Bogotá','Medellín','Cali','Barranquilla','Cartagena'];
+/* Proveedores sugeridos por ciudad. Los TELÉFONOS van vacíos a propósito:
+   no inventamos números de empresas reales — complétalos y verifícalos tú. */
+const PROV_SUGERIDOS=[].concat(...CIUDADES.map(c=>[
+ {nombre:'Homecenter / Sodimac — '+c, tel:'', ciudad:c},
+ {nombre:'Constructor (Sodimac) — '+c, tel:'', ciudad:c},
+ {nombre:'Ferretería local — '+c,      tel:'', ciudad:c}
+]));
 function ferreterias(){
- try{const v=JSON.parse(localStorage.getItem(FERRE_KEY)||'null');if(Array.isArray(v)&&v.length)return v;}catch(e){}
+ try{const v=JSON.parse(localStorage.getItem(FERRE_KEY)||'null');if(Array.isArray(v)&&v.length)return v.map(f=>({ciudad:'',...f}));}catch(e){}
  return [
-  {nombre:'Ferretería Metro',tel:'573187855308'},
-  {nombre:'Ferretería La Mayor',tel:'573128312937'},
-  {nombre:'Ferretería El Ingenio',tel:'573185231499'}
+  {nombre:'Ferretería Metro',tel:'573187855308',ciudad:'Cali'},
+  {nombre:'Ferretería La Mayor',tel:'573128312937',ciudad:'Cali'},
+  {nombre:'Ferretería El Ingenio',tel:'573185231499',ciudad:'Cali'}
  ];
 }
+const optCiudades=(sel,inc)=>(inc?['<option value="">'+inc+'</option>']:[]).concat(
+  CIUDADES.map(c=>`<option ${c===sel?'selected':''}>${c}</option>`)).join('');
 function saveFerreterias(list){localStorage.setItem(FERRE_KEY,JSON.stringify(list));}
 let waTitulo='';
 function openWaCotizar(ins){
+ if(!proGuard('Cotizar materias primas con proveedores'))return;
  waTitulo=ins.nombre||'Material';
  $('wa-material').innerHTML=`Material: <b style="color:var(--accent)">${ins.nombre}</b> (${ins.unidad||'un'})`;
  const mat=(P.materiales||[]).find(m=>(ins.codigo&&m.codigo===ins.codigo)||m.nombre===ins.nombre);
@@ -2116,6 +2142,7 @@ function waLineas(insumos){
  }).join('\n');
 }
 function openWaCotizarLista(titulo,insumos){
+ if(!proGuard('Cotizar materias primas con proveedores'))return;
  const cotizables=(insumos||[]).filter(x=>x&&x.nombre&&x.tipo!=='MO');
  if(!cotizables.length){flash('No hay materiales cotizables (se excluye la mano de obra)');return;}
  waTitulo=titulo;
@@ -2130,14 +2157,38 @@ ${waLineas(cotizables)}
  $('modal-wa').classList.add('on');
 }
 function renderWaBtns(){
+ // selector de ciudad (una sola vez); por defecto la ciudad del proyecto
+ const selC=$('wa-ciudad');
+ if(selC&&!selC.options.length){
+  const pref=CIUDADES.includes(P.model.ciudad)?P.model.ciudad:'';
+  selC.innerHTML=optCiudades(pref,'Todas las ciudades');
+  selC.value=pref;
+  selC.onchange=renderWaBtns;
+ }
+ const ciudad=selC?selC.value:'';
  const wrap=$('wa-btns'); wrap.innerHTML='';
- ferreterias().forEach(f=>{
+ const todos=ferreterias();
+ const lista=ciudad?todos.filter(f=>(f.ciudad||'')===ciudad):todos;
+ const conTel=lista.filter(f=>f.tel);
+ conTel.forEach(f=>{
   const b=document.createElement('button');
   b.className='btn viol sm';
-  b.innerHTML=`<span class="ic">✆</span> ${f.nombre} <span class="hint" style="margin-left:4px">+${f.tel}</span>`;
+  b.innerHTML=`<span class="ic">✆</span> ${f.nombre}${f.ciudad?` <span class="hint" style="margin-left:4px">${f.ciudad}</span>`:''} <span class="hint" style="margin-left:4px">+${f.tel}</span>`;
   b.onclick=()=>window.open('https://wa.me/'+f.tel+'?text='+encodeURIComponent($('wa-msg').value),'_blank','noopener');
   wrap.appendChild(b);
  });
+ const sinTel=lista.length-conTel.length;
+ if(!conTel.length){
+  const n=document.createElement('span'); n.className='hint';
+  n.innerHTML=lista.length
+   ? `Los ${lista.length} proveedores de <b>${ciudad}</b> aún no tienen WhatsApp — complétalo en la pestaña <b>Proveedores</b>.`
+   : `No hay proveedores${ciudad?' en <b>'+ciudad+'</b>':''} — agrégalos en la pestaña <b>Proveedores</b>.`;
+  wrap.appendChild(n);
+ } else if(sinTel){
+  const n=document.createElement('span'); n.className='hint';
+  n.textContent=`(${sinTel} sin WhatsApp — complétalos en Proveedores)`;
+  wrap.appendChild(n);
+ }
  const mb=document.createElement('button');
  mb.className='btn sm';
  mb.innerHTML='<span class="ic">✉</span> Correo (mailto)';
@@ -2207,6 +2258,7 @@ function renderApuEdit(){
 $('apuedit-add').onclick=()=>{APUEDIT.insumos.push({codigo:'',nombre:'',tipo:'MAT',unidad:'un',rendimiento:1,desperdicio:0,precio_unitario:0});APUEDIT.dirty=true;renderApuEdit();};
 $('apuedit-cotizar').onclick=()=>openWaCotizarLista($('apuedit-nombre').value.trim()||'APU',APUEDIT.insumos);
 async function saveApuEdit(){
+ if(!proGuard('Guardar APUs nuevos en tu cuenta'))return null;
  if(!cfUrl()){$('apuedit-out').innerHTML='<b style="color:var(--accent-2)">Configura la URL de Cloudflare (botón ☁) para guardar el nuevo APU.</b>';return null;}
  const body={nombre:$('apuedit-nombre').value.trim(),unidad:$('apuedit-unidad').value.trim(),
   insumos:APUEDIT.insumos.filter(x=>x.nombre&&(parseFloat(x.rendimiento)||0)>0&&(parseFloat(x.precio_unitario)||0)>0)};
@@ -2380,6 +2432,7 @@ $('mat-esp').onchange=renderMat;
 /* ---- 1: borradores de correo por especialidad ---- */
 let mailCustom=false;
 document.querySelectorAll('.btn-esp').forEach(b=>b.onclick=()=>{
+ if(!proGuard('Cotizar materias primas con proveedores'))return;
  const esp=b.dataset.esp;
  const list=P.materiales.filter(m=>m.esp===esp);
  if(!list.length){flash('No hay materiales de '+esp+' — pulsa primero «Calcular materiales totales»');return;}
@@ -2483,28 +2536,48 @@ function renderProvDir(){
  const tb=tbl.querySelector('tbody'); tb.innerHTML='';
  const list=ferreterias();
  if(!localStorage.getItem(FERRE_KEY))saveFerreterias(list);
- if(!list.length){tb.innerHTML='<tr><td colspan="4" class="hint" style="font-style:italic;padding:10px">Sin proveedores — agrega el primero arriba.</td></tr>';return;}
+ // selects de ciudad (alta y filtro)
+ const selAdd=$('prov-dir-ciudad'); if(selAdd&&!selAdd.options.length)selAdd.innerHTML=optCiudades(P.model.ciudad||'','Sin ciudad');
+ const selF=$('prov-dir-filtro'); if(selF&&!selF.options.length){selF.innerHTML=optCiudades('','Todas las ciudades');selF.onchange=renderProvDir;}
+ const filtro=selF?selF.value:'';
+ if(!list.length){tb.innerHTML='<tr><td colspan="5" class="hint" style="font-style:italic;padding:10px">Sin proveedores — agrega el primero arriba.</td></tr>';return;}
+ let mostrados=0;
  list.forEach((f,i)=>{
+  if(filtro && (f.ciudad||'')!==filtro)return;
+  mostrados++;
   const tr=document.createElement('tr');
+  const sinTel=!f.tel;
   tr.innerHTML=`<td><input value="${(f.nombre||'').replace(/"/g,'&quot;')}"></td>
-   <td><input value="${(f.tel||'').replace(/"/g,'&quot;')}"></td>
+   <td><select>${optCiudades(f.ciudad||'','Sin ciudad')}</select></td>
+   <td><input value="${(f.tel||'').replace(/"/g,'&quot;')}" placeholder="${sinTel?'completar…':''}" style="${sinTel?'border-color:var(--accent)':''}"></td>
    <td style="text-align:center"><button class="btn sm viol prov-wa">✆ Probar</button></td>
    <td style="text-align:center"><span class="prov-del" title="Quitar" style="cursor:pointer;color:var(--accent-2);font-weight:700">✕</span></td>`;
   const [iN,iT]=tr.querySelectorAll('input');
+  const sC=tr.querySelector('select');
   iN.oninput=()=>{const l=ferreterias();l[i].nombre=iN.value;saveFerreterias(l);};
-  iT.onchange=()=>{const l=ferreterias();l[i].tel=telNorm(iT.value);saveFerreterias(l);iT.value=l[i].tel;};
+  sC.onchange=()=>{const l=ferreterias();l[i].ciudad=sC.value;saveFerreterias(l);};
+  iT.onchange=()=>{const l=ferreterias();l[i].tel=telNorm(iT.value);saveFerreterias(l);iT.value=l[i].tel;renderProvDir();};
   tr.querySelector('.prov-wa').onclick=()=>{const t=telNorm(f.tel);if(!t){flash('Falta el WhatsApp de '+(f.nombre||'este proveedor'));return;}window.open('https://wa.me/'+t+'?text='+encodeURIComponent('Buen día, '+(f.nombre||'')+'. Quisiéramos cotizar materiales para un proyecto.'),'_blank','noopener');};
   tr.querySelector('.prov-del').onclick=()=>{const l=ferreterias();l.splice(i,1);saveFerreterias(l);renderProvDir();};
   tb.appendChild(tr);
  });
+ if(!mostrados)tb.innerHTML='<tr><td colspan="5" class="hint" style="font-style:italic;padding:10px">Ningún proveedor en esa ciudad — agrégalo arriba o carga los sugeridos.</td></tr>';
 }
+$('prov-dir-seed').onclick=()=>{
+ const l=ferreterias(); let add=0;
+ PROV_SUGERIDOS.forEach(sug=>{ if(!l.some(f=>f.nombre===sug.nombre))
+  { l.push({...sug}); add++; } });
+ saveFerreterias(l); renderProvDir();
+ flash(add?`✓ ${add} proveedores agregados en las 5 ciudades — completa sus WhatsApp (no inventamos números reales)`:'Ya estaban cargados');
+};
 $('prov-dir-add').onclick=()=>{
  const nombre=($('prov-dir-nombre').value||'').trim();
  const tel=telNorm($('prov-dir-tel').value);
+ const ciudad=($('prov-dir-ciudad').value||'');
  if(!nombre){flash('Escribe el nombre del proveedor');return;}
- const l=ferreterias(); l.push({nombre,tel}); saveFerreterias(l);
+ const l=ferreterias(); l.push({nombre,tel,ciudad}); saveFerreterias(l);
  $('prov-dir-nombre').value='';$('prov-dir-tel').value='';
- renderProvDir(); flash('Proveedor agregado al directorio');
+ renderProvDir(); flash('Proveedor agregado'+(ciudad?' en '+ciudad:''));
 };
 
 /* ============ SUB-PESTAÑA: COTIZACIONES DE PROVEEDORES Y TOTAL ============ */
