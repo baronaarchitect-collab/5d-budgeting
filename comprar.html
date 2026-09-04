@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>5D Budgeting · Versión de escritorio (Pro)</title>
+<title>5D Budgeting · Plan Pro</title>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -61,8 +61,8 @@
 </div></nav>
 
 <div class="wrap">
-  <h1>Versión de escritorio <span style="color:var(--viol)">Pro</span></h1>
-  <p class="sub">Trabaja sin conexión en tu propio computador y <b>sube los APUs de tu ciudad</b> como base principal. Un solo pago, tuya para siempre en ese equipo.</p>
+  <h1>Plan <span style="color:var(--viol)">Pro</span></h1>
+  <p class="sub">Desbloquea <b>subir los APUs de tu ciudad</b>, <b>guardar tus propios APUs</b> en la nube y <b>cotizar materias primas</b> con tus proveedores. Se activa solo al confirmarse el pago.</p>
 
   <div class="grid">
     <div class="plan">
@@ -73,20 +73,21 @@
         <li>APU desde la nube (Cloudflare)</li>
         <li>Materiales y cotización con proveedores</li>
         <li class="no">Subir los APUs de tu ciudad</li>
-        <li class="no">Uso 100% sin conexión</li>
+        <li class="no">Guardar APUs nuevos en tu cuenta</li>
+        <li class="no">Cotizar materias primas con proveedores</li>
       </ul>
       <a class="btn" style="width:100%;justify-content:center;margin-top:18px" href="login.html?signup=1">Usar la versión web</a>
     </div>
 
     <div class="plan hi">
-      <div class="tag">Pro · Escritorio</div>
+      <div class="tag">Pro</div>
       <div class="price" id="precio">$120.000 <small>COP · pago único</small></div>
       <ul>
-        <li>Todo lo de la versión web</li>
-        <li><b>Sube los APUs de tu propia ciudad</b> (JSON con insumos o Excel)</li>
-        <li>Funciona 100% sin conexión, en tu equipo</li>
-        <li>Tus proyectos y tu base APU quedan en tu computador</li>
-        <li>Actualizaciones incluidas</li>
+        <li>Todo lo del plan gratis</li>
+        <li><b>Sube los APUs de tu ciudad</b> (Excel, CSV o PDF) y súbelos a la nube</li>
+        <li><b>Guarda los APUs que crees</b> en tu cuenta</li>
+        <li><b>Cotiza materias primas</b> con tus proveedores (WhatsApp / correo)</li>
+        <li>Tus proyectos sincronizados en todos tus dispositivos</li>
       </ul>
       <button class="btn primary lg" id="btn-pagar" style="width:100%;justify-content:center;margin-top:18px"><span>💳</span> Pagar con Wompi</button>
       <p class="muted" id="pay-email" style="margin-top:10px"></p>
@@ -94,11 +95,11 @@
     </div>
   </div>
 
-  <div class="box" id="box-descarga">
-    <h3>⬇️ Descargar la versión de escritorio</h3>
-    <div class="step"><div class="n">1</div><div>Pulsa <b>Pagar con Wompi</b> y completa el pago <b>usando el correo de tu cuenta</b> (así se activa solo).</div></div>
-    <div class="step"><div class="n">2</div><div>Vuelve aquí y pulsa <b>«Ya pagué — verificar»</b>. Si el pago está confirmado, Pro se activa automáticamente.</div></div>
-    <div class="step"><div class="n">3</div><div>Descomprime el ZIP y ejecuta <b>Iniciar 5D Budgeting.bat</b> (Windows) o <code>python serve.py</code>.</div></div>
+  <div class="box" id="box-activacion">
+    <h3>✅ Cómo se activa tu Pro</h3>
+    <div class="step"><div class="n">1</div><div>Pulsa <b>Pagar con Wompi</b> y completa el pago.</div></div>
+    <div class="step"><div class="n">2</div><div>En el pago, usa el <b>correo de la cuenta que quieres activar</b> como Pro.</div></div>
+    <div class="step"><div class="n">3</div><div>Al confirmarse el pago, tu cuenta queda en Pro <b>automáticamente</b>. Si quieres verlo al instante, pulsa el botón de abajo.</div></div>
 
     <div id="gate" style="margin-top:14px">
       <div id="gate-code" style="display:none">
@@ -110,14 +111,12 @@
       </div>
       <div id="gate-honor" style="display:none">
         <button class="btn ok" id="btn-verificar"><span>✓</span> Ya pagué — verificar</button>
-        <button class="btn" id="btn-yapague" style="margin-left:8px"><span>⏱</span> Activar manualmente</button>
       </div>
       <div class="flash" id="gate-flash"></div>
     </div>
 
     <div id="dl" style="display:none;margin-top:14px">
-      <a class="btn ok lg" id="btn-dl" href="descarga/5d-budgeting-escritorio.zip" download><span>⬇️</span> Descargar ZIP (versión de escritorio)</a>
-      <p class="muted" style="margin-top:8px">Incluye la app, el lanzador y la carpeta de ejemplos. Requiere Python 3 para el modo servidor (recomendado), o ábrela directamente en el navegador.</p>
+      <p class="muted" style="color:var(--ok)">Tu cuenta ya está en <b>Pro</b>. Entra a <a href="dashboard.html">tu dashboard</a> y verás desbloqueadas las funciones Pro en la pestaña Presupuesto.</p>
     </div>
   </div>
 
@@ -127,18 +126,18 @@
     <div class="step"><div class="n">A</div><div>En tu panel de <b>Wompi → Links de pago</b>, crea un link para "5D Budgeting Pro" y pégalo en <code>PAGO.link</code> (ej: <code>https://checkout.wompi.co/l/XXXXX</code>).</div></div>
     <div class="step"><div class="n">B</div><div>Ajusta el precio mostrado en <code>PAGO.precioCOP</code> (la etiqueta; el cobro real lo define el link de Wompi).</div></div>
     <div class="step"><div class="n">C</div><div><b>Activación automática (gratis):</b> conecta los <b>eventos de Wompi</b> a un <b>Google Apps Script</b> que marca <code>pro:true</code> en Firestore al confirmarse el pago. Paso a paso en <code>apps-script/README.md</code> (alternativa sin costo a Cloud Functions).</div></div>
-    <div class="step"><div class="n">D</div><div><b>Código de activación (opcional):</b> define <code>ACCESS_CODE</code> para exigir un código que envías tras el pago. Vacío = activación por confianza (“Ya pagué”).</div></div>
-    <p class="muted">Nota: sin el webhook, la activación es por confianza (del lado del navegador). El webhook de Wompi es lo que la vuelve verificada de verdad.</p>
+    <div class="step"><div class="n">D</div><div><b>Código de activación (opcional):</b> define <code>ACCESS_CODE</code> para exigir un código que envías tras el pago.</div></div>
+    <p class="muted">El webhook de Apps Script ya está activo: al confirmarse el pago marca <code>pro:true</code> en Firestore. El botón «Ya pagué — verificar» solo relee ese estado.</p>
   </div>
 </div>
 
-<footer><div class="wrap">5D BUDGETING · LifeCity BIM Hub — versión de escritorio Pro.</div></footer>
+<footer><div class="wrap">5D BUDGETING · LifeCity BIM Hub — Plan Pro.</div></footer>
 
 <script>
 /* ================== CONFIGURA AQUÍ TU COBRO (WOMPI) ==================
    Crea un "Link de pago" en tu panel de Wompi y pégalo abajo. */
 const PAGO = {
-  link:   'https://checkout.wompi.co/l/RMNKBv',   // link de pago Wompi (PRUEBA)
+  link:   'https://checkout.wompi.co/l/q7powt',   // link de pago Wompi (PRODUCCIÓN)
   precioCOP: 120000
 };
 const ACCESS_CODE = '';  // Déjalo vacío para activación por confianza; ponle un código para exigirlo.
@@ -151,18 +150,17 @@ function revealGate(){
   if(ACCESS_CODE){ $('gate-code').style.display='block'; }
   else { $('gate-honor').style.display='block'; }
 }
-async function unlock(){
-  try{ if(window.SAAS){ await SAAS.ready; await SAAS.setPro(true); } else { localStorage.setItem('budgeting5d_pro','1'); } }catch(e){ try{localStorage.setItem('budgeting5d_pro','1');}catch(_){} }
+function unlock(){
   $('dl').style.display='block';
-  $('gate-flash').innerHTML='<b style="color:var(--ok)">✓ Pro activado en tu cuenta. Descarga habilitada y «subir tus APUs a la nube» desbloqueado.</b>';
-  $('btn-dl').scrollIntoView({behavior:'smooth',block:'center'});
+  $('gate-flash').innerHTML='<b style="color:var(--ok)">✓ Pro activo en tu cuenta.</b>';
+  $('dl').scrollIntoView({behavior:'smooth',block:'center'});
 }
 
 $('btn-pagar').onclick=()=>{
   const f=$('pay-flash');
   if(PAGO.link){
     window.open(PAGO.link,'_blank','noopener');
-    f.innerHTML='Abrimos el pago de Wompi en otra pestaña. Al terminar, activa tu Pro abajo. ↓';
+    f.innerHTML='Abrimos el pago de Wompi en otra pestaña. Al confirmarse, tu Pro se activa solo. ↓';
     revealGate();
   } else {
     f.innerHTML='<b style="color:var(--accent)">El link de pago aún no está configurado.</b> Pega tu link de Wompi en <code>PAGO.link</code> (ver «Para el dueño de la cuenta»).';
@@ -184,7 +182,6 @@ $('btn-code') && ($('btn-code').onclick=()=>{
   if(($('code').value||'').trim()===ACCESS_CODE && ACCESS_CODE){ unlock(); }
   else { $('gate-flash').innerHTML='<b style="color:var(--accent-2)">Código incorrecto.</b>'; }
 });
-$('btn-yapague') && ($('btn-yapague').onclick=unlock);
 
 // si ya es Pro en su cuenta/navegador, muestra la descarga directo
 (async()=>{
@@ -192,9 +189,7 @@ $('btn-yapague') && ($('btn-yapague').onclick=unlock);
     if(window.SAAS){
       await SAAS.ready;
       // muestra con qué correo debe pagar para que se active solo
-      const em = SAAS.user && SAAS.user.email;
-      if(em) $('pay-email').innerHTML = '💡 Paga usando este correo para que Pro se active automáticamente: <b style="color:var(--accent)">'+em+'</b>';
-      else $('pay-email').innerHTML = '💡 <a href="login.html">Inicia sesión</a> antes de pagar para que Pro se active automáticamente en tu cuenta.';
+      $('pay-email').innerHTML = '💡 Al pagar, usa el <b style="color:var(--accent)">correo de la cuenta que quieres activar</b> como Pro. La activación es automática.';
       await SAAS.refreshProfile();
       if(SAAS.isPro()){ revealGate(); unlock(); }
     } else if(localStorage.getItem('budgeting5d_pro')==='1'){ revealGate(); unlock(); }
