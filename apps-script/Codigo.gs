@@ -17,10 +17,19 @@ const WOMPI_EVENTS_SECRET = '';
 // → Cuentas de servicio → Generar nueva clave privada). Del JSON descargado:
 const SA_EMAIL = 'PEGA_client_email_DEL_JSON';
 const SA_PRIVATE_KEY = 'PEGA_private_key_DEL_JSON';  // incluye -----BEGIN PRIVATE KEY----- ... y los \n
+
+// ¿Ya tenías OTRA URL de eventos en Wompi? Wompi solo admite UNA por ambiente,
+// así que ponla aquí y este script le reenvía cada evento tal cual (sin tocarlo),
+// para que siga funcionando igual que antes. Puedes poner varias.
+const REENVIAR_A = [
+  // 'https://tu-otra-url.com/webhook-wompi',
+];
 // ============================================================
 
 /** Wompi hace POST aquí con cada evento. */
 function doPost(e) {
+  // Primero reenviamos a tus otras URLs (si las hay), pase lo que pase después.
+  reenviar(e);
   try {
     const evt = JSON.parse(e.postData.contents);
 
@@ -142,6 +151,31 @@ function activarPro(uid, tx) {
     payload: JSON.stringify(cuerpo), muteHttpExceptions: true
   });
   if (res.getResponseCode() >= 300) throw new Error('Firestore: ' + res.getContentText());
+}
+
+/**
+ * Reenvía el evento ORIGINAL (mismo cuerpo y content-type) a otras URLs.
+ * Como se manda intacto, la firma de Wompi sigue siendo válida allá.
+ */
+function reenviar(e) {
+  if (!REENVIAR_A || !REENVIAR_A.length) return;
+  try {
+    const peticiones = REENVIAR_A.map(function (url) {
+      return {
+        url: url,
+        method: 'post',
+        contentType: (e.postData && e.postData.type) || 'application/json',
+        payload: (e.postData && e.postData.contents) || '',
+        muteHttpExceptions: true
+      };
+    });
+    const res = UrlFetchApp.fetchAll(peticiones);
+    for (let i = 0; i < res.length; i++) {
+      registrar('REENVIADO', { url: REENVIAR_A[i], codigo: res[i].getResponseCode() });
+    }
+  } catch (err) {
+    registrar('REENVIO_ERROR', { error: String(err) });
+  }
 }
 
 /** Deja rastro en los Registros de Apps Script (Ver → Ejecuciones). */

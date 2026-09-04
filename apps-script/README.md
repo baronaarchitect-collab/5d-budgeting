@@ -45,6 +45,28 @@ Es la alternativa **gratuita** a Cloud Functions (que exige plan Blaze).
    `WOMPI_EVENTS_SECRET` dentro del Apps Script → guarda → **Implementar → Editar
    implementación → Nueva versión** (importante: cada cambio necesita nueva versión).
 
+## 4-bis) ¿Ya tenías otra URL de eventos?
+
+Wompi admite **una sola URL de eventos por ambiente** (una para pruebas y otra para
+producción); no es una lista. Si pones la del Apps Script, la anterior deja de recibir.
+
+Solución: deja la del Apps Script como única URL en Wompi y dile que **reenvíe** el evento
+a la tuya anterior. En `Codigo.gs`:
+
+```js
+const REENVIAR_A = [
+  'https://tu-otra-url.com/webhook-wompi',
+];
+```
+
+El evento se reenvía **tal cual** (mismo cuerpo y content-type), así que la firma de Wompi
+sigue siendo válida en el otro extremo y ese sistema no nota diferencia. Puedes poner
+varias URLs. En **Ejecuciones** verás una línea `REENVIADO` con el código de respuesta de
+cada una. Si un reenvío falla, no afecta la activación de Pro.
+
+> Si lo que tenías era la URL de **otro ambiente** (pruebas vs producción), no hay conflicto:
+> cada ambiente tiene su propio campo y su propio secreto.
+
 ## 5) Que el pago se asocie a la cuenta correcta
 El script busca al usuario por el **correo** con el que se pagó en Wompi.
 Por eso la página de compra le muestra al usuario:
