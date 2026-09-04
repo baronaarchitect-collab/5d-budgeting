@@ -67,6 +67,34 @@ cada una. Si un reenvío falla, no afecta la activación de Pro.
 > Si lo que tenías era la URL de **otro ambiente** (pruebas vs producción), no hay conflicto:
 > cada ambiente tiene su propio campo y su propio secreto.
 
+### Si tu URL anterior TAMBIÉN es un Apps Script
+Tienes dos caminos:
+
+**A. Dos scripts + reenvío (recomendado, riesgo cero).**
+Dejas el script viejo intacto, en el nuevo pones su URL en `REENVIAR_A`, y en Wompi
+configuras la URL del script nuevo. El viejo sigue recibiendo todo igual.
+
+**B. Un solo script.** Pegas las funciones de este archivo dentro del proyecto viejo,
+pero **renombra `doPost`** para que no choque con el que ya existe, y llámalo desde el
+`doPost` original:
+
+```js
+// en el doPost que YA tienes, agrega al principio:
+function doPost(e) {
+  try { activarProWompi(e); } catch (err) { console.log('pro: ' + err); }
+
+  // ...aquí sigue TODO tu código actual, sin tocar...
+}
+
+// y pega este archivo renombrando su doPost a:
+function activarProWompi(e) { /* el cuerpo del doPost de este archivo */ }
+```
+Con B no tienes que cambiar nada en Wompi (la URL sigue siendo la misma).
+
+> ⚠️ **Nunca** pongas la URL real de tus webhooks (ni el secreto de Wompi, ni la clave de
+> la cuenta de servicio) en archivos del repo: este repositorio es **público**. Esos
+> valores van solo dentro del editor de Apps Script.
+
 ## 5) Que el pago se asocie a la cuenta correcta
 El script busca al usuario por el **correo** con el que se pagó en Wompi.
 Por eso la página de compra le muestra al usuario:
