@@ -48,10 +48,10 @@
   footer{border-top:1px solid var(--line);margin-top:50px;padding:22px 0;color:var(--text-dim);font-size:12px}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
-<script src="firebase-config.js?v=3"></script>
-<script src="config.js?v=3"></script>
-<script src="auth.js?v=3"></script>
-<script src="saas.js?v=3"></script>
+<script src="firebase-config.js?v=4"></script>
+<script src="config.js?v=4"></script>
+<script src="auth.js?v=4"></script>
+<script src="saas.js?v=4"></script>
 </head>
 <body>
 <nav><div class="wrap row">
@@ -81,16 +81,18 @@
 
     <div class="plan hi">
       <div class="tag">Pro</div>
-      <div class="price" id="precio">$120.000 <small>COP · pago único</small></div>
+      <div class="price" id="precio">$120.000 <small>COP / mes</small></div>
       <ul>
         <li>Todo lo del plan gratis</li>
         <li><b>Sube los APUs de tu ciudad</b> (Excel, CSV o PDF) y súbelos a la nube</li>
         <li><b>Guarda los APUs que crees</b> en tu cuenta</li>
         <li><b>Cotiza materias primas</b> con tus proveedores (WhatsApp / correo)</li>
         <li>Tus proyectos sincronizados en todos tus dispositivos</li>
+        <li>Renovación mensual — sin permanencia, renuevas cuando quieras</li>
       </ul>
       <button class="btn primary lg" id="btn-pagar" style="width:100%;justify-content:center;margin-top:18px"><span>💳</span> Pagar con Wompi</button>
       <p class="muted" id="pay-email" style="margin-top:10px"></p>
+      <p class="muted" id="pro-estado" style="margin-top:6px"></p>
       <div class="flash" id="pay-flash"></div>
     </div>
   </div>
@@ -99,7 +101,7 @@
     <h3>✅ Cómo se activa tu Pro</h3>
     <div class="step"><div class="n">1</div><div>Pulsa <b>Pagar con Wompi</b> y completa el pago.</div></div>
     <div class="step"><div class="n">2</div><div>En el pago, usa el <b>correo de la cuenta que quieres activar</b> como Pro.</div></div>
-    <div class="step"><div class="n">3</div><div>Al confirmarse el pago, tu cuenta queda en Pro <b>automáticamente</b>. Si quieres verlo al instante, pulsa el botón de abajo.</div></div>
+    <div class="step"><div class="n">3</div><div>Al confirmarse el pago, tu cuenta queda en Pro <b>automáticamente</b> por <b>30 días</b>. Si pagas antes de vencer, los días <b>se suman</b>.</div></div>
 
     <div id="gate" style="margin-top:14px">
       <div id="gate-code" style="display:none">
@@ -144,16 +146,35 @@ const ACCESS_CODE = '';  // Déjalo vacío para activación por confianza; ponle
 /* ==================================================================== */
 
 const $=id=>document.getElementById(id);
-$('precio').innerHTML='$'+PAGO.precioCOP.toLocaleString('es-CO')+' <small>COP · pago único</small>';
+$('precio').innerHTML='$'+PAGO.precioCOP.toLocaleString('es-CO')+' <small>COP / mes</small>';
 
 function revealGate(){
   if(ACCESS_CODE){ $('gate-code').style.display='block'; }
   else { $('gate-honor').style.display='block'; }
 }
+function fechaBonita(iso){
+  if(!iso) return '';
+  const d=new Date(iso+'T12:00:00');
+  return isNaN(d)?iso:d.toLocaleDateString('es-CO',{day:'2-digit',month:'long',year:'numeric'});
+}
 function unlock(){
   $('dl').style.display='block';
-  $('gate-flash').innerHTML='<b style="color:var(--ok)">✓ Pro activo en tu cuenta.</b>';
+  const h=window.SAAS?SAAS.proHasta():'', d=window.SAAS?SAAS.diasRestantes():null;
+  $('gate-flash').innerHTML='<b style="color:var(--ok)">✓ Pro activo'+(h?' hasta el '+fechaBonita(h)+(d!=null?' ('+d+' días)':''):'')+'.</b>';
   $('dl').scrollIntoView({behavior:'smooth',block:'center'});
+}
+function pintarEstadoPro(){
+  const el=$('pro-estado'); if(!el||!window.SAAS) return;
+  const h=SAAS.proHasta(), d=SAAS.diasRestantes();
+  if(SAAS.isPro()){
+    el.innerHTML = h
+      ? '✅ Tu Pro está <b style="color:var(--ok)">activo</b> hasta el <b>'+fechaBonita(h)+'</b>'+(d!=null?' — quedan <b>'+d+' días</b>':'')+'. Si pagas ahora, se suman 30 días más.'
+      : '✅ Tu Pro está <b style="color:var(--ok)">activo</b>.';
+  } else if(SAAS.proVencido()){
+    el.innerHTML = '⚠️ Tu Pro <b style="color:var(--accent-2)">venció</b> el <b>'+fechaBonita(h)+'</b>. Renuévalo para recuperar el acceso.';
+  } else {
+    el.innerHTML = '';
+  }
 }
 
 $('btn-pagar').onclick=()=>{
@@ -174,6 +195,7 @@ $('btn-verificar') && ($('btn-verificar').onclick=async()=>{
     await SAAS.ready;
     if(!SAAS.configured){ g.innerHTML='<b style="color:var(--accent)">Sin Firebase configurado</b> — usa «Activar manualmente».'; return; }
     await SAAS.refreshProfile();
+    pintarEstadoPro();
     if(SAAS.isPro()){ unlock(); return; }
     g.innerHTML='<b style="color:var(--accent)">Aún no vemos el pago confirmado.</b> Espera ~1 minuto y vuelve a pulsar. Si pagaste con otro correo, escríbenos y lo activamos.';
   }catch(e){ g.innerHTML='<b style="color:var(--accent-2)">No se pudo verificar: '+(e.message||e)+'</b>'; }
@@ -191,6 +213,7 @@ $('btn-code') && ($('btn-code').onclick=()=>{
       // muestra con qué correo debe pagar para que se active solo
       $('pay-email').innerHTML = '💡 Al pagar, usa el <b style="color:var(--accent)">correo de la cuenta que quieres activar</b> como Pro. La activación es automática.';
       await SAAS.refreshProfile();
+      pintarEstadoPro();
       if(SAAS.isPro()){ revealGate(); unlock(); }
     } else if(localStorage.getItem('budgeting5d_pro')==='1'){ revealGate(); unlock(); }
   }catch(e){}

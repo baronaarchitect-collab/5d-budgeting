@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="firebase-config.js?v=3"></script>
-<script src="config.js?v=3"></script>
-<script src="auth.js?v=3"></script>
-<script src="saas.js?v=3"></script>
+<script src="firebase-config.js?v=4"></script>
+<script src="config.js?v=4"></script>
+<script src="auth.js?v=4"></script>
+<script src="saas.js?v=4"></script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -1834,7 +1834,12 @@ async function loadApuBase(){
 function renderApuOwnInfo(){
  const info=$('apu-own-info'), lock=$('apu-pro-lock'), btns=$('apu-propia-btns');
  if(!info)return;
- if(!isPro()){ if(lock)lock.style.display='block'; if(btns)btns.style.display='none'; info.textContent=''; return; }
+ if(!isPro()){
+  if(lock)lock.style.display='block'; if(btns)btns.style.display='none';
+  const venc=(window.SAAS&&SAAS.proVencido&&SAAS.proVencido())?SAAS.proHasta():'';
+  info.innerHTML = venc?'<b style="color:var(--accent-2)">Tu Pro venció el '+venc+'.</b> Renuévalo para volver a usar estas funciones.':'';
+  return;
+ }
  if(lock)lock.style.display='none'; if(btns)btns.style.display='';
  const own=loadOwnApuBase();
  info.innerHTML=own

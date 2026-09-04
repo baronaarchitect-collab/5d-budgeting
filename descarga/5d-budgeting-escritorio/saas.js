@@ -78,9 +78,30 @@ window.SAAS = (function () {
       } catch (e) { return null; }
     },
 
+    // Fecha (YYYY-MM-DD) hasta la que está pagado el Pro, o '' si no aplica
+    proHasta() { return (state.profile && state.profile.proHasta) || ''; },
+    // Días que faltan para vencer (null si no hay vencimiento). Negativo = ya venció.
+    diasRestantes() {
+      const h = this.proHasta();
+      if (!h) return null;
+      const fin = new Date(h + 'T23:59:59');
+      if (isNaN(fin.getTime())) return null;
+      return Math.ceil((fin - new Date()) / 86400000);
+    },
+    proVencido() {
+      const p = state.profile;
+      if (!p || !p.pro || !p.proHasta) return false;
+      return p.proHasta < new Date().toISOString().slice(0, 10);
+    },
+
     isPro() {
       // En la nube la VERDAD es Firestore (lo escribe el webhook de Wompi tras el pago).
-      if (state.mode === 'firebase') return !!(state.profile && state.profile.pro);
+      if (state.mode === 'firebase') {
+        const p = state.profile;
+        if (!p || !p.pro) return false;
+        if (!p.proHasta) return true;   // cuentas antiguas sin vencimiento: siguen activas
+        return p.proHasta >= new Date().toISOString().slice(0, 10);
+      }
       return !!(window.APP_CONFIG && APP_CONFIG.pro) || localStorage.getItem('budgeting5d_pro') === '1';
     },
     async setPro(v) {

@@ -40,10 +40,10 @@
   .hint{font-size:10px;color:var(--text-dim);line-height:1.6}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
-<script src="firebase-config.js?v=3"></script>
-<script src="config.js?v=3"></script>
-<script src="auth.js?v=3"></script>
-<script src="saas.js?v=3"></script>
+<script src="firebase-config.js?v=4"></script>
+<script src="config.js?v=4"></script>
+<script src="auth.js?v=4"></script>
+<script src="saas.js?v=4"></script>
 </head>
 <body>
 <header>
@@ -74,7 +74,21 @@ let me=null;
   const cloud=SAAS.configured;
   $('chip-mode').textContent = cloud?'☁ Nube':'⚠ Local';
   $('chip-mode').className='chip '+(cloud?'cloud':'local');
-  if(SAAS.isPro()){ $('chip-pro').style.display=''; }
+  if(SAAS.isPro()){
+    const d=SAAS.diasRestantes(), h=SAAS.proHasta();
+    const c=$('chip-pro'); c.style.display='';
+    if(h){
+      const f=new Date(h+'T12:00:00');
+      c.textContent='★ Pro · vence '+(isNaN(f)?h:f.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}));
+      c.title='Tu Pro está pagado hasta el '+h;
+      if(d!=null&&d<=7){ c.style.background='rgba(244,185,66,.18)'; c.style.color='var(--accent)'; c.textContent='★ Pro · '+d+' días'; }
+    }
+  } else if(SAAS.proVencido && SAAS.proVencido()){
+    const c=$('chip-pro'); c.style.display='';
+    c.style.background='rgba(255,82,82,.18)'; c.style.color='var(--accent-2)';
+    c.textContent='Pro vencido'; c.title='Renuévalo en Plan Pro';
+    c.style.cursor='pointer'; c.onclick=()=>location.href='comprar.html';
+  }
   $('foot').innerHTML = cloud
     ? 'Tus proyectos se guardan en tu cuenta (Firestore) y se sincronizan en todos tus dispositivos.'
     : '⚠ Modo local: los proyectos viven en este navegador. Configura Firebase (FIREBASE-SETUP.md) para SaaS real.';

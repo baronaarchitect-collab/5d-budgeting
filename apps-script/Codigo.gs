@@ -11,7 +11,11 @@ const FIREBASE_PROJECT_ID = 'd-budgeting-18a11';
 
 // Súbele el número cada vez que edites este archivo. Luego abre la URL /exec en el
 // navegador: si ves este mismo número, la versión desplegada YA es la nueva.
-const VERSION = 1;
+const VERSION = 2;
+
+// Días de Pro que otorga cada pago (suscripción mensual).
+const DIAS_POR_PAGO = 30;
+const ZONA = 'America/Bogota';
 
 // Secreto de EVENTOS de Wompi (Panel Wompi → Configuración → Eventos).
 // Si lo dejas vacío, NO se valida la firma (úsalo solo para probar).
@@ -55,8 +59,8 @@ function doPost(e) {
       return salida({ ok: false, error: 'no se encontró usuario para ' + email });
     }
 
-    activarPro(uid, tx);
-    registrar('PRO_ACTIVADO', { uid: uid, email: email, txId: tx.id, monto: tx.amount_in_cents });
+    const hasta = activarPro(uid, tx);
+    registrar('PRO_ACTIVADO', { uid: uid, email: email, txId: tx.id, monto: tx.amount_in_cents, proHasta: hasta });
     return salida({ ok: true, uid: uid });
 
   } catch (err) {
@@ -73,7 +77,8 @@ function doGet() {
     proyecto: FIREBASE_PROJECT_ID,
     version: VERSION,                       // <- compara con el VERSION de tu código
     firmaValidada: !!WOMPI_EVENTS_SECRET,   // false = aún no pusiste el secreto de Wompi
-    reenviosConfigurados: REENVIAR_A.length
+    reenviosConfigurados: REENVIAR_A.length,
+    diasPorPago: DIAS_POR_PAGO
   });
 }
 
@@ -143,14 +148,42 @@ function buscarUidPorCorreo(email) {
 }
 
 /** Marca pro:true en users/{uid}. */
+/** Lee el documento users/{uid} y devuelve sus campos (o null). */
+function leerUsuario(uid) {
+  const url = 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ID +
+              '/databases/(default)/documents/users/' + uid;
+  const res = UrlFetchApp.fetch(url, {
+    headers: { Authorization: 'Bearer ' + tokenAcceso() }, muteHttpExceptions: true
+  });
+  if (res.getResponseCode() >= 300) return null;
+  const d = JSON.parse(res.getContentText());
+  return (d && d.fields) ? d.fields : null;
+}
+
+/**
+ * Activa/renueva Pro sumando DIAS_POR_PAGO.
+ * Si aún le queda vigencia, se ACUMULA (paga antes de vencer y no pierde días).
+ */
 function activarPro(uid, tx) {
+  const campos = leerUsuario(uid);
+  const ahora = new Date();
+  let desde = ahora;
+  if (campos && campos.proHasta && campos.proHasta.stringValue) {
+    const actual = new Date(campos.proHasta.stringValue + 'T23:59:59');
+    if (!isNaN(actual.getTime()) && actual > ahora) desde = actual;
+  }
+  const hasta = new Date(desde.getTime() + DIAS_POR_PAGO * 24 * 60 * 60 * 1000);
+  const proHasta = Utilities.formatDate(hasta, ZONA, 'yyyy-MM-dd');
+
   const url = 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ID +
               '/databases/(default)/documents/users/' + uid +
-              '?updateMask.fieldPaths=pro&updateMask.fieldPaths=proSince' +
+              '?updateMask.fieldPaths=pro&updateMask.fieldPaths=proHasta' +
+              '&updateMask.fieldPaths=proSince' +
               '&updateMask.fieldPaths=lastPaymentId&updateMask.fieldPaths=lastPaymentAmount';
   const cuerpo = {
     fields: {
       pro: { booleanValue: true },
+      proHasta: { stringValue: proHasta },
       proSince: { stringValue: new Date().toISOString() },
       lastPaymentId: { stringValue: String(tx.id || '') },
       lastPaymentAmount: { integerValue: String(tx.amount_in_cents || 0) }
@@ -162,6 +195,7 @@ function activarPro(uid, tx) {
     payload: JSON.stringify(cuerpo), muteHttpExceptions: true
   });
   if (res.getResponseCode() >= 300) throw new Error('Firestore: ' + res.getContentText());
+  return proHasta;
 }
 
 /**
@@ -199,6 +233,54 @@ function salida(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * OPCIONAL — Recordatorio de vencimiento.
+ * Avisa por correo a quien le queden DIAS_AVISO días de Pro.
+ * Para activarlo: en Apps Script → ⏰ Activadores → Añadir activador →
+ * función `recordatorioVencimientos`, basado en tiempo, cada día.
+ */
+const DIAS_AVISO = 3;
+const URL_RENOVAR = 'https://baronaarchitect-collab.github.io/5d-budgeting/comprar.html';
+
+function recordatorioVencimientos() {
+  const objetivo = Utilities.formatDate(
+    new Date(Date.now() + DIAS_AVISO * 24 * 60 * 60 * 1000), ZONA, 'yyyy-MM-dd');
+
+  const url = 'https://firestore.googleapis.com/v1/projects/' + FIREBASE_PROJECT_ID +
+              '/databases/(default)/documents:runQuery';
+  const cuerpo = {
+    structuredQuery: {
+      from: [{ collectionId: 'users' }],
+      where: { fieldFilter: { field: { fieldPath: 'proHasta' }, op: 'EQUAL', value: { stringValue: objetivo } } }
+    }
+  };
+  const res = UrlFetchApp.fetch(url, {
+    method: 'post', contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + tokenAcceso() },
+    payload: JSON.stringify(cuerpo), muteHttpExceptions: true
+  });
+  const arr = JSON.parse(res.getContentText());
+  let enviados = 0;
+  for (let i = 0; i < arr.length; i++) {
+    const doc = arr[i].document;
+    if (!doc || !doc.fields) continue;
+    const correo = doc.fields.email && doc.fields.email.stringValue;
+    const nombre = (doc.fields.name && doc.fields.name.stringValue) || '';
+    if (!correo) continue;
+    try {
+      MailApp.sendEmail({
+        to: correo,
+        subject: 'Tu Pro de 5D Budgeting vence en ' + DIAS_AVISO + ' días',
+        htmlBody: 'Hola ' + nombre + ',<br><br>Tu plan <b>Pro</b> vence el <b>' + objetivo + '</b>.<br>' +
+                  'Para no perder el acceso a subir tus APUs, guardar APUs en tu cuenta y cotizar con proveedores, ' +
+                  'renuévalo aquí:<br><br><a href="' + URL_RENOVAR + '">Renovar mi Pro</a><br><br>— 5D Budgeting · LifeCity'
+      });
+      enviados++;
+    } catch (e) { registrar('AVISO_ERROR', { correo: correo, error: String(e) }); }
+  }
+  registrar('AVISOS_ENVIADOS', { fecha: objetivo, enviados: enviados });
+}
+
 /** ---- Utilidades para probar a mano desde el editor ---- */
 
 // Activa Pro manualmente para un correo (útil para el pago que ya hiciste).
@@ -206,8 +288,8 @@ function activarProManualPorCorreo() {
   const CORREO = 'pon_aqui@el-correo.com';   // <-- cámbialo y ejecuta esta función
   const uid = buscarUidPorCorreo(CORREO.toLowerCase().trim());
   if (!uid) throw new Error('No se encontró usuario con ese correo');
-  activarPro(uid, { id: 'manual', amount_in_cents: 0 });
-  console.log('✓ Pro activado para ' + CORREO + ' (uid ' + uid + ')');
+  const hasta = activarPro(uid, { id: 'manual', amount_in_cents: 0 });
+  console.log('✓ Pro activado para ' + CORREO + ' (uid ' + uid + ') hasta el ' + hasta);
 }
 
 // Comprueba que la cuenta de servicio y Firestore responden.
