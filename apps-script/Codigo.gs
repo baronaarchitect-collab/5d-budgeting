@@ -9,6 +9,10 @@
 // ====================== CONFIGURA ESTO ======================
 const FIREBASE_PROJECT_ID = 'd-budgeting-18a11';
 
+// Súbele el número cada vez que edites este archivo. Luego abre la URL /exec en el
+// navegador: si ves este mismo número, la versión desplegada YA es la nueva.
+const VERSION = 1;
+
 // Secreto de EVENTOS de Wompi (Panel Wompi → Configuración → Eventos).
 // Si lo dejas vacío, NO se valida la firma (úsalo solo para probar).
 const WOMPI_EVENTS_SECRET = '';
@@ -63,7 +67,14 @@ function doPost(e) {
 
 /** Para probar en el navegador que el webhook está vivo. */
 function doGet() {
-  return salida({ ok: true, servicio: '5D Budgeting · webhook Wompi', proyecto: FIREBASE_PROJECT_ID });
+  return salida({
+    ok: true,
+    servicio: '5D Budgeting · webhook Wompi',
+    proyecto: FIREBASE_PROJECT_ID,
+    version: VERSION,                       // <- compara con el VERSION de tu código
+    firmaValidada: !!WOMPI_EVENTS_SECRET,   // false = aún no pusiste el secreto de Wompi
+    reenviosConfigurados: REENVIAR_A.length
+  });
 }
 
 /** Valida el checksum SHA-256 que envía Wompi. */
