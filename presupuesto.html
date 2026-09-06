@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="firebase-config.js?v=4"></script>
-<script src="config.js?v=4"></script>
-<script src="auth.js?v=4"></script>
-<script src="saas.js?v=4"></script>
+<script src="firebase-config.js?v=5"></script>
+<script src="config.js?v=5"></script>
+<script src="auth.js?v=5"></script>
+<script src="saas.js?v=5"></script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -736,7 +736,9 @@ const CAT_MAP={WALL:'Muros',WALLSTANDARDCASE:'Muros',SLAB:'Losas',COLUMN:'Column
  FLOWFITTING:'Uniones/accesorios MEP',PIPEFITTING:'Uniones de tubería',DUCTFITTING:'Uniones de ducto',CABLECARRIERFITTING:'Uniones de conduit',JUNCTIONBOX:'Cajas/uniones',
  SANITARYTERMINAL:'Aparatos sanitarios',VALVE:'Válvulas'};
 /* Categorías MEP que se separan por DIÁMETRO (cada diámetro = actividad/ítem nuevo) */
-const MEP_SPLIT=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE)$/;
+const MEP_SPLIT=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE|DISTRIBUTIONFLOWELEMENT|DISTRIBUTIONELEMENT|FLOWCONTROLLER)$/;
+/* Tubos propiamente dichos: si no se halla el diámetro se marca «Ø s/d» para que se note. */
+const MEP_TUBO=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING)$/;
 
 function parseIfcText(text){
  const counts={}; let m;
@@ -779,7 +781,7 @@ function normFecha(v){
  if(m)return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
  return '';
 }
-const ELEM_RE=/^(WALL|WALLSTANDARDCASE|SLAB|COLUMN|BEAM|DOOR|WINDOW|STAIR|STAIRFLIGHT|ROOF|FOOTING|PILE|COVERING|MEMBER|PLATE|RAILING|CURTAINWALL|BUILDINGELEMENTPROXY|FLOWTERMINAL|FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE|SANITARYTERMINAL|RAMP|ELEMENTASSEMBLY)$/;
+const ELEM_RE=/^(WALL|WALLSTANDARDCASE|SLAB|COLUMN|BEAM|DOOR|WINDOW|STAIR|STAIRFLIGHT|ROOF|FOOTING|PILE|COVERING|MEMBER|PLATE|RAILING|CURTAINWALL|BUILDINGELEMENTPROXY|FLOWTERMINAL|FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE|SANITARYTERMINAL|DISTRIBUTIONFLOWELEMENT|DISTRIBUTIONELEMENT|FLOWCONTROLLER|RAMP|ELEMENTASSEMBLY)$/;
 /* extrae un rótulo de diámetro del nombre del tipo (1/2", 3/4", DN50, Ø50, 50mm) */
 function diamFromName(s){
  s=String(s||'').replace(/\\/g,'');
@@ -869,7 +871,7 @@ function parseTiposCantidades(ents){
   const e=ents[id]; if(e.t!=='PROPERTYSINGLEVALUE')continue;
   const strs=getStrs(e.p);
   const nombre=(strs[0]||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();
-  if(!/(DIAMETER|DIAMETRO|NOMINAL|\bDN\b|\bSIZE\b|CALIBRE|OUTSIDE\s*DIAM|OUTER\s*DIAM|\bOD\b|\bDIAM)/.test(nombre))continue;
+  if(!/(DIAMETER|DIAMETRO|NOMINAL|\bDN\b|\bSIZE\b|TAMANO|TRADE\s*SIZE|\bNPS\b|PULGAD|CALIBRE|OUTSIDE\s*DIAM|OUTER\s*DIAM|\bOD\b|\bDIAM)/.test(nombre))continue;
   const mv=e.p.match(/IFC(?:POSITIVELENGTHMEASURE|LENGTHMEASURE|REAL|LABEL|TEXT|IDENTIFIER)\s*\(\s*(?:'((?:[^']|'')*)'|([-\d.eE+]+))\s*\)/);
   if(!mv)continue;
   let label='';
@@ -888,19 +890,38 @@ function parseTiposCantidades(ents){
   const refs=getRefs(ents[id].p);
   const d=diaSet[refs[refs.length-1]];
   if(!d)continue;
+  // el pset puede colgar de instancias O de un TIPO: se asigna a todos por igual
   for(let i=0;i<refs.length-1;i++)elemDia[refs[i]]=d;
+ }
+ // 3c) diámetro declarado dentro del propio TIPO (IfcPipeSegmentType, IfcCableCarrierSegmentType…)
+ for(const id in ents){
+  const e=ents[id];
+  if(!/TYPE$/.test(e.t)||e.t==='RELDEFINESBYTYPE'||elemDia[id])continue;
+  for(const r of getRefs(e.p)){ if(diaSet[r]){ elemDia[id]=diaSet[r]; break; } }
+ }
+ // 3d) elemento -> su TIPO, para heredar el diámetro del tipo
+ const tipoDeElem={};
+ for(const id in ents){
+  if(ents[id].t!=='RELDEFINESBYTYPE')continue;
+  const refs=getRefs(ents[id].p);
+  const tId=refs[refs.length-1];
+  for(let i=0;i<refs.length-1;i++)tipoDeElem[refs[i]]=tId;
  }
  // 4) tipo de Revit por elemento (Name sin el id de instancia) + agregado por tipo
  //     MEP (tubería/conduit/uniones) se separa por DIÁMETRO → cada diámetro es un tipo/ítem nuevo
  const tipos={}, elems={};
+ let mepCon=0, mepSin=0;
  for(const id in ents){
   const e=ents[id];
   if(!ELEM_RE.test(e.t))continue;
   const strs=getStrs(e.p);
   let tipo=(strs[1]||e.t).replace(/:\d+$/,'');
   if(MEP_SPLIT.test(e.t)){
-   const d=elemDia[id]||diamFromName(strs[1]||'')||diamFromName(tipo);
-   tipo=tipo+' · '+(d||'Ø s/d');
+   // 1) propiedad de la instancia · 2) heredada del TIPO · 3) textos del propio elemento
+   let d=elemDia[id]||(tipoDeElem[id]?elemDia[tipoDeElem[id]]:'')||'';
+   if(!d){ for(let k=1;k<Math.min(strs.length,5);k++){ d=diamFromName(strs[k]); if(d)break; } }
+   if(d){ tipo=tipo+' · '+d; mepCon++; }
+   else if(MEP_TUBO.test(e.t)){ tipo=tipo+' · Ø s/d'; mepSin++; }
   }
   const cat=CAT_MAP[e.t]||e.t;
   const q=elemQ[id]||{};
@@ -909,7 +930,7 @@ function parseTiposCantidades(ents){
   t.un++; t.m2+=q.m2||0; t.ml+=q.ml||0; t.m3+=q.m3||0;
  }
  for(const k in tipos){const t=tipos[k];t.m2=Math.round(t.m2*100)/100;t.ml=Math.round(t.ml*100)/100;t.m3=Math.round(t.m3*1000)/1000;}
- return {tipos,elems};
+ return {tipos,elems,mepDiag:{conDiam:mepCon,sinDiam:mepSin}};
 }
 
 /* unidad del APU → clave de cantidad del IFC: m2=área, ml=longitud, m3=volumen, un=conteo */
@@ -1003,6 +1024,7 @@ $('file-ifc').onchange=e=>{
    const tq=parseTiposCantidades(ents);
    IFC_ELEMS=tq.elems;
    P.model.tipos=tq.tipos;
+   P.model.mepDiag=tq.mepDiag;
    // actividades PSI_* (cronograma 4D exportado desde Revit)
    const acts=parsePsiActivities(ents);
    if(acts.length){
@@ -1156,6 +1178,11 @@ function renderModel(){
  let html='';
  if(tks.length){
   html+='<p class="hint" style="margin-bottom:4px"><b>Tipos de Revit</b> — a cada tipo se le enlaza un APU en Presupuesto (cantidades un/m²/ml/m³ leídas de los quantity sets del IFC):</p>';
+  const dg=m.mepDiag;
+  if(dg&&(dg.conDiam||dg.sinDiam)){
+   html+='<p class="hint" style="margin-bottom:6px">🔧 Tubería/conduit/uniones: <b style="color:var(--ok)">'+dg.conDiam+'</b> con diámetro detectado'+
+    (dg.sinDiam?' · <b style="color:var(--accent)">'+dg.sinDiam+' sin diámetro</b> (marcados «Ø s/d»): exporta el IFC con el parámetro <i>Diameter/Size</i> o inclúyelo en el nombre del tipo.':'')+'</p>';
+  }
   html+='<div style="max-height:260px;overflow:auto"><table class="tbl"><thead><tr><th>Tipo</th><th>Categoría</th><th>un</th><th>m²</th><th>ml</th><th>m³</th></tr></thead><tbody>'+
    tks.sort().map(k=>{const t=tipos[k];return `<tr><td>${k}</td><td class="hint">${t.cat||''}</td><td>${t.un||0}</td><td>${t.m2||'—'}</td><td>${t.ml||'—'}</td><td>${t.m3||'—'}</td></tr>`;}).join('')+
    '</tbody></table></div>';
