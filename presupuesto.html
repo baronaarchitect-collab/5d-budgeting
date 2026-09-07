@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="firebase-config.js?v=5"></script>
-<script src="config.js?v=5"></script>
-<script src="auth.js?v=5"></script>
-<script src="saas.js?v=5"></script>
+<script src="firebase-config.js?v=6"></script>
+<script src="config.js?v=6"></script>
+<script src="auth.js?v=6"></script>
+<script src="saas.js?v=6"></script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -899,6 +899,29 @@ function parseTiposCantidades(ents){
   if(!/TYPE$/.test(e.t)||e.t==='RELDEFINESBYTYPE'||elemDia[id])continue;
   for(const r of getRefs(e.p)){ if(diaSet[r]){ elemDia[id]=diaSet[r]; break; } }
  }
+ // 3c-bis) TODAS las propiedades (nombre+valor) por elemento, para buscar el diámetro
+ //          por el VALOR aunque el parámetro se llame distinto.
+ const propNV={};
+ for(const id in ents){
+  const e=ents[id]; if(e.t!=='PROPERTYSINGLEVALUE')continue;
+  const st=getStrs(e.p);
+  const mv=e.p.match(/IFC[A-Z]+\s*\(\s*(?:'((?:[^']|'')*)'|([-\d.eE+]+))\s*\)/);
+  let v=''; if(mv) v = mv[1]!==undefined ? mv[1].replace(/''/g,"'") : mv[2];
+  propNV[id]={n:(st[0]||''), v:v};
+ }
+ const setProps={};
+ for(const id in ents){
+  if(ents[id].t!=='PROPERTYSET')continue;
+  setProps[id]=getRefs(ents[id].p).filter(r=>propNV[r]);
+ }
+ const elemProps={};
+ for(const id in ents){
+  if(ents[id].t!=='RELDEFINESBYPROPERTIES')continue;
+  const refs=getRefs(ents[id].p);
+  const ps=setProps[refs[refs.length-1]];
+  if(!ps||!ps.length)continue;
+  for(let i=0;i<refs.length-1;i++){ (elemProps[refs[i]]=elemProps[refs[i]]||[]).push.apply(elemProps[refs[i]],ps); }
+ }
  // 3d) elemento -> su TIPO, para heredar el diámetro del tipo
  const tipoDeElem={};
  for(const id in ents){
@@ -910,7 +933,7 @@ function parseTiposCantidades(ents){
  // 4) tipo de Revit por elemento (Name sin el id de instancia) + agregado por tipo
  //     MEP (tubería/conduit/uniones) se separa por DIÁMETRO → cada diámetro es un tipo/ítem nuevo
  const tipos={}, elems={};
- let mepCon=0, mepSin=0;
+ let mepCon=0, mepSin=0; const mepParams={};
  for(const id in ents){
   const e=ents[id];
   if(!ELEM_RE.test(e.t))continue;
@@ -919,9 +942,21 @@ function parseTiposCantidades(ents){
   if(MEP_SPLIT.test(e.t)){
    // 1) propiedad de la instancia · 2) heredada del TIPO · 3) textos del propio elemento
    let d=elemDia[id]||(tipoDeElem[id]?elemDia[tipoDeElem[id]]:'')||'';
+   // barrido por VALOR: sirve aunque el parámetro se llame Size, Pipe Size, Tamaño…
+   const misProps=(elemProps[id]||[]).concat(tipoDeElem[id]?(elemProps[tipoDeElem[id]]||[]):[]);
+   if(!d){
+    for(let k=0;k<misProps.length;k++){
+     const pv=propNV[misProps[k]]; if(!pv||pv.v==='')continue;
+     const c=diamFromName(String(pv.v)); if(c){ d=c; break; }
+    }
+   }
    if(!d){ for(let k=1;k<Math.min(strs.length,5);k++){ d=diamFromName(strs[k]); if(d)break; } }
    if(d){ tipo=tipo+' · '+d; mepCon++; }
-   else if(MEP_TUBO.test(e.t)){ tipo=tipo+' · Ø s/d'; mepSin++; }
+   else if(MEP_TUBO.test(e.t)){
+    tipo=tipo+' · Ø s/d'; mepSin++;
+    // guarda qué parámetros trae ese tubo, para poder diagnosticar el export
+    for(let k=0;k<misProps.length;k++){ const pv=propNV[misProps[k]]; if(pv&&pv.n) mepParams[pv.n]=(mepParams[pv.n]||0)+1; }
+   }
   }
   const cat=CAT_MAP[e.t]||e.t;
   const q=elemQ[id]||{};
@@ -930,7 +965,8 @@ function parseTiposCantidades(ents){
   t.un++; t.m2+=q.m2||0; t.ml+=q.ml||0; t.m3+=q.m3||0;
  }
  for(const k in tipos){const t=tipos[k];t.m2=Math.round(t.m2*100)/100;t.ml=Math.round(t.ml*100)/100;t.m3=Math.round(t.m3*1000)/1000;}
- return {tipos,elems,mepDiag:{conDiam:mepCon,sinDiam:mepSin}};
+ const topParams=Object.keys(mepParams).sort((a,b)=>mepParams[b]-mepParams[a]).slice(0,18);
+ return {tipos,elems,mepDiag:{conDiam:mepCon,sinDiam:mepSin,params:topParams}};
 }
 
 /* unidad del APU → clave de cantidad del IFC: m2=área, ml=longitud, m3=volumen, un=conteo */
@@ -1181,7 +1217,12 @@ function renderModel(){
   const dg=m.mepDiag;
   if(dg&&(dg.conDiam||dg.sinDiam)){
    html+='<p class="hint" style="margin-bottom:6px">🔧 Tubería/conduit/uniones: <b style="color:var(--ok)">'+dg.conDiam+'</b> con diámetro detectado'+
-    (dg.sinDiam?' · <b style="color:var(--accent)">'+dg.sinDiam+' sin diámetro</b> (marcados «Ø s/d»): exporta el IFC con el parámetro <i>Diameter/Size</i> o inclúyelo en el nombre del tipo.':'')+'</p>';
+    (dg.sinDiam?' · <b style="color:var(--accent)">'+dg.sinDiam+' sin diámetro</b> (marcados «Ø s/d»)':'')+'</p>';
+   if(dg.sinDiam&&dg.params&&dg.params.length){
+    html+='<p class="hint" style="margin:-2px 0 8px">Parámetros que traen esos tubos: <code style="font-size:10px">'+
+      dg.params.map(x=>String(x).replace(/</g,'&lt;')).join('</code> · <code style="font-size:10px">')+
+      '</code> — si ves ahí el del diámetro y no se detectó, pásamelo y lo afino.</p>';
+   }
   }
   html+='<div style="max-height:260px;overflow:auto"><table class="tbl"><thead><tr><th>Tipo</th><th>Categoría</th><th>un</th><th>m²</th><th>ml</th><th>m³</th></tr></thead><tbody>'+
    tks.sort().map(k=>{const t=tipos[k];return `<tr><td>${k}</td><td class="hint">${t.cat||''}</td><td>${t.un||0}</td><td>${t.m2||'—'}</td><td>${t.ml||'—'}</td><td>${t.m3||'—'}</td></tr>`;}).join('')+
