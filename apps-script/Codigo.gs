@@ -240,7 +240,7 @@ function salida(obj) {
  * función `recordatorioVencimientos`, basado en tiempo, cada día.
  */
 const DIAS_AVISO = 3;
-const URL_RENOVAR = 'https://baronaarchitect-collab.github.io/5d-budgeting/comprar.html';
+const URL_RENOVAR = 'https://presupuesto.lifecity.com.co/comprar.html';
 
 function recordatorioVencimientos() {
   const objetivo = Utilities.formatDate(

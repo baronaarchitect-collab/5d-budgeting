@@ -16,7 +16,7 @@ usuario**. El pago se cobra con un **link de Wompi**. Sin backend propio.
 1. Console → **Build → Authentication → Get started**.
 2. Habilita **Correo electrónico/contraseña**. (Opcional: **Google**.)
 3. **Authentication → Settings → Authorized domains**: agrega
-   `baronaarchitect-collab.github.io` (y `localhost` para pruebas).
+   `presupuesto.lifecity.com.co`, `baronaarchitect-collab.github.io` (y `localhost` para pruebas).
 
 ## 3) Activar Firestore
 1. Console → **Build → Firestore Database → Create database** (modo producción).
