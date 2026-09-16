@@ -38,12 +38,18 @@
   .pill.warn{background:rgba(244,185,66,.18);color:var(--accent)}
   .empty{color:var(--text-dim);padding:40px;text-align:center;font-style:italic;border:1px dashed var(--line)}
   .hint{font-size:10px;color:var(--text-dim);line-height:1.6}
+  #est-modal{display:none;position:fixed;inset:0;background:rgba(5,8,13,.82);backdrop-filter:blur(4px);z-index:900;align-items:center;justify-content:center}
+  #est-modal .bx{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:22px;width:min(600px,94vw)}
+  #est-modal table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
+  #est-modal th,#est-modal td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}
+  #est-modal th{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim)}
+  #est-modal input{background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:6px;font-family:var(--mono);font-size:11px;width:100px}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
-<script src="firebase-config.js?v=6"></script>
-<script src="config.js?v=6"></script>
-<script src="auth.js?v=6"></script>
-<script src="saas.js?v=6"></script>
+<script src="firebase-config.js?v=7"></script>
+<script src="config.js?v=7"></script>
+<script src="auth.js?v=7"></script>
+<script src="saas.js?v=7"></script>
 </head>
 <body>
 <header>
@@ -53,6 +59,7 @@
   <div class="grow"></div>
   <span class="who" id="who"></span>
   <a class="btn" href="bienvenida.html" title="Guía rápida y trucos"><span class="ic">💡</span> Tips</a>
+  <button class="btn" id="btn-est" title="Rango de precio por m² antes del presupuesto"><span class="ic">⚡</span> Estimación rápida</button>
   <button class="btn primary" id="btn-nuevo"><span class="ic">+</span> Nuevo proyecto</button>
   <button class="btn" id="btn-logout"><span class="ic">⏻</span> Salir</button>
 </header>
@@ -61,10 +68,40 @@
   <div id="grid"><div class="empty">Cargando…</div></div>
   <p class="hint" id="foot"></p>
 </main>
+<div id="est-modal">
+  <div class="bx">
+    <div style="display:flex;align-items:center;gap:10px"><b style="font-family:var(--display);font-size:15px">⚡ Estimación rápida por m²</b><span style="flex:1"></span><button class="btn" id="est-x">✕</button></div>
+    <p class="hint" style="margin-top:6px">El rango de precio que piden los desarrolladores <b>antes</b> del presupuesto detallado: m² por tipo de obra × tus costos de referencia por m². Los costos se configuran en cualquier proyecto → pestaña <b>Indicadores</b>.</p>
+    <table id="est-tbl"><thead><tr><th>Tipo de obra</th><th>m²</th><th>Costo/m² mín</th><th>Costo/m² máx</th></tr></thead><tbody></tbody></table>
+    <p id="est-res" style="margin-top:12px;font-size:12px"></p>
+  </div>
+</div>
 <script>
 const $=id=>document.getElementById(id);
 const fmt=n=>'$'+(n||0).toLocaleString('es-CO');
 let me=null;
+const TIPOS_OBRA=[['urbanismo','Urbanismo'],['edificacion','Edificación'],['reforzamiento','Reforzamiento']];
+$('btn-est').onclick=async()=>{
+  const ref=(SAAS.loadMeta?await SAAS.loadMeta('costos_m2'):null)||{};
+  const tb=$('est-tbl').querySelector('tbody'); tb.innerHTML='';
+  const m2={};
+  const calc=()=>{
+    let mn=0,mx=0,a=0;
+    TIPOS_OBRA.forEach(([k])=>{ const r=ref[k]||{}; const v=m2[k]||0; a+=v; mn+=v*(parseFloat(r.min)||0); mx+=v*(parseFloat(r.max)||0); });
+    $('est-res').innerHTML = !a ? 'Escribe los m² por tipo de obra.'
+      : (mn||mx) ? `Rango estimado: <b style="color:var(--accent);font-size:14px">${fmt(Math.round(mn))} – ${fmt(Math.round(mx))}</b> para ${a.toLocaleString('es-CO')} m²`
+      : '<span style="color:var(--accent)">Aún no tienes costos/m² de referencia — configúralos en un proyecto → Indicadores.</span>';
+  };
+  TIPOS_OBRA.forEach(([k,lab])=>{
+    const r=ref[k]||{}; const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${lab}</td><td><input type="number" step="any" placeholder="0"></td><td>${r.min?fmt(Math.round(r.min)):'—'}</td><td>${r.max?fmt(Math.round(r.max)):'—'}</td>`;
+    tr.querySelector('input').oninput=e=>{ m2[k]=parseFloat(e.target.value)||0; calc(); };
+    tb.appendChild(tr);
+  });
+  calc(); $('est-modal').style.display='flex';
+};
+$('est-x').onclick=()=>$('est-modal').style.display='none';
+$('est-modal').onclick=e=>{ if(e.target.id==='est-modal') $('est-modal').style.display='none'; };
 
 (async()=>{
   await SAAS.ready;

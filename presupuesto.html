@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="firebase-config.js?v=6"></script>
-<script src="config.js?v=6"></script>
-<script src="auth.js?v=6"></script>
-<script src="saas.js?v=6"></script>
+<script src="firebase-config.js?v=7"></script>
+<script src="config.js?v=7"></script>
+<script src="auth.js?v=7"></script>
+<script src="saas.js?v=7"></script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -122,6 +122,7 @@
   <button class="tabbtn" data-tab="cronograma" style="display:none"><span class="ic">▦</span> Cronograma</button>
   <button class="tabbtn" data-tab="materiales"><span class="ic">▤</span> Materiales</button>
   <button class="tabbtn" data-tab="proveedores"><span class="ic">☎</span> Proveedores</button>
+  <button class="tabbtn" data-tab="indicadores"><span class="ic">📊</span> Indicadores</button>
   <button class="tabbtn" data-tab="documentos" style="display:none"><span class="ic">✓</span> Documentos <span id="docs-badge" class="pill falta">0%</span></button>
   <button class="tabbtn" data-tab="aseguradoras" style="display:none"><span class="ic">⛨</span> Aseguradoras</button>
   <button class="tabbtn" data-tab="correo" style="display:none"><span class="ic">✉</span> Correo</button>
@@ -444,6 +445,7 @@
 <!-- ============ MATERIALES ============ -->
 <section class="panel" id="panel-materiales">
   <div class="grid4" id="mat-stats"></div>
+  <div class="grid4" id="mat-stats2" style="margin-top:2px"></div>
   <div class="box">
     <h3><span class="dot"></span> Materiales totales del proyecto (agregados de todas las actividades)</h3>
     <div class="btnrow">
@@ -491,6 +493,45 @@
       <button class="btn ok" id="btn-cf-push"><span class="ic">☁</span> Actualizar precios en Cloudflare</button>
       <p class="hint" id="cf-push-out"></p>
     </div>
+  </div>
+</section>
+
+<!-- ============ INDICADORES ============ -->
+<section class="panel" id="panel-indicadores">
+  <div class="grid4" id="ind-stats"></div>
+  <div class="cols">
+    <div class="box">
+      <h3><span class="dot"></span> ⚡ Estimación rápida por m² — el rango que piden los desarrolladores</h3>
+      <p class="hint">Antes del presupuesto detallado: <b>m² por tipo de obra × tu costo de referencia por m²</b>. Los valores son tuyos (se guardan en tu cuenta) y van separados por <b>urbanismo, edificación y reforzamiento</b>, porque el peso de las redes cambia con el tipo de obra — no se usa un % fijo.</p>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-est">
+        <thead><tr><th>Tipo de obra</th><th style="width:110px">m² del proyecto</th><th style="width:120px">Costo/m² mín</th><th style="width:120px">Costo/m² máx</th><th style="width:88px">% redes esp.</th><th>Rango</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <div class="btnrow" style="align-items:center">
+        <span class="hint" id="est-out" style="flex:1"></span>
+        <button class="btn sm" id="btn-est-guardar"><span class="ic">💾</span> Guardar mis costos/m²</button>
+      </div>
+    </div>
+    <div class="box">
+      <h3><span class="dot"></span> Redes: % del costo directo, por disciplina</h3>
+      <div id="ind-redes"></div>
+      <p class="hint">Calculado con lo que realmente está enlazado a APU (actividades IFC + costos directos). La disciplina se lee del parámetro <i>Sistema / System</i> del IFC, del nombre del tipo (PVC‑S, PVC‑P, EMT…) o de la categoría.</p>
+    </div>
+  </div>
+  <div class="cols">
+    <div class="box">
+      <h3><span class="dot"></span> Top 10 · Materiales más caros</h3>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-top-mat"><thead><tr><th>#</th><th>Insumo</th><th>Tipo</th><th>Cant.</th><th>Total</th><th>%</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="box">
+      <h3><span class="dot"></span> Top 10 · Actividades más caras</h3>
+      <div style="overflow-x:auto"><table class="tbl" id="tbl-top-act"><thead><tr><th>#</th><th>Actividad</th><th>Disciplina</th><th>Cant.</th><th>Total</th><th>%</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+  <div class="box">
+    <h3><span class="dot"></span> Totales por tipo de costo (de los materiales consolidados)</h3>
+    <div class="grid4" id="ind-tipos"></div>
+    <p class="hint">Materiales / mano de obra / equipos / <b>transporte</b> (insumos cuyo nombre contiene TRANSPORTE, ACARREO o FLETE). Solo cuentan los APUs con desglose de insumos; los importados por Excel plano no aportan.</p>
   </div>
 </section>
 
@@ -722,6 +763,7 @@ document.querySelectorAll('.tabbtn[data-tab]').forEach(b=>b.onclick=()=>{
  if(b.dataset.tab==='materiales')renderMat();
  if(b.dataset.tab==='proveedores')renderProvDir();
  if(b.dataset.tab==='presupuesto')renderProvSub();
+ if(b.dataset.tab==='indicadores')renderIndicadores();
 });
 /* ---- sub-pestañas dentro de Presupuesto ---- */
 document.querySelectorAll('.subtab[data-sub]').forEach(b=>b.onclick=()=>{
@@ -739,6 +781,20 @@ const CAT_MAP={WALL:'Muros',WALLSTANDARDCASE:'Muros',SLAB:'Losas',COLUMN:'Column
 const MEP_SPLIT=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE|DISTRIBUTIONFLOWELEMENT|DISTRIBUTIONELEMENT|FLOWCONTROLLER)$/;
 /* Tubos propiamente dichos: si no se halla el diámetro se marca «Ø s/d» para que se note. */
 const MEP_TUBO=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING)$/;
+/* Disciplina de redes: del parámetro Sistema/System del IFC, del nombre del tipo (PVC-S, PVC-P, EMT…) o de la categoría */
+const ES_MEP_ELEM=/^(FLOWTERMINAL|SANITARYTERMINAL)$/;
+function disciplinaMEP(cat, textos){
+ const s=(textos||[]).filter(Boolean).join(' | ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+ if(/ELECTR|POWER|ILUMIN|LIGHT|VOLT|TOMACORR|TOMA ELEC|CONDUIT|\bEMT\b|PVC-E\b|CABLE|COMUNIC|\bDATA\b|TELEC|CCTV|ALARMA/.test(s))return 'Eléctrica';
+ if(/\bGAS\b|\bGLP\b|GAS NATURAL/.test(s))return 'Gas';
+ if(/SANIT|AGUAS NEGRAS|AGUAS LLUVIA|PLUVIAL|DESAG|ALCANT|DRENAJE|RESIDUAL|PVC-S\b|PVC S\b|SEWER|WASTE|STORM/.test(s))return 'Sanitaria';
+ if(/HIDR|AGUA FRIA|AGUA CALIENTE|POTABLE|DOMESTIC|SUMINISTRO|ACUEDUCTO|PVC-P\b|PVC P\b|CPVC|PRESION|INCENDIO|SPRINKLER|\bRCI\b/.test(s))return 'Hidráulica';
+ if(/DUCT|VENTIL|\bAIRE\b|HVAC|EXTRACC|CLIMAT|MECANIC|SUPPLY AIR|RETURN AIR|EXHAUST/.test(s))return 'Ventilación';
+ if(/Conduit|Cableado|Cajas/.test(cat||''))return 'Eléctrica';
+ if(/Ducto/.test(cat||''))return 'Ventilación';
+ if(/Tubería|Uniones de tubería|Válvulas|Aparatos sanitarios|Aparatos MEP|Redes MEP|accesorios MEP/.test(cat||''))return 'Redes (sin disciplina)';
+ return '';
+}
 
 function parseIfcText(text){
  const counts={}; let m;
@@ -959,9 +1015,19 @@ function parseTiposCantidades(ents){
    }
   }
   const cat=CAT_MAP[e.t]||e.t;
+  // disciplina (solo elementos MEP): parámetro Sistema/System → textos del elemento → categoría
+  let disc='';
+  if(MEP_SPLIT.test(e.t)||ES_MEP_ELEM.test(e.t)){
+   const txt=[];
+   const pr=(elemProps[id]||[]).concat(tipoDeElem[id]?(elemProps[tipoDeElem[id]]||[]):[]);
+   for(let k=0;k<pr.length;k++){ const pv=propNV[pr[k]]; if(pv&&pv.v&&/SISTEMA|SYSTEM|DISCIPLIN|SERVICIO|SERVICE/i.test(pv.n)) txt.push(String(pv.v)); }
+   for(let k=1;k<Math.min(strs.length,5);k++) txt.push(strs[k]);
+   disc=disciplinaMEP(cat,txt);
+  }
   const q=elemQ[id]||{};
-  elems[id]={tipo,cat,q};
-  const t=tipos[tipo]=tipos[tipo]||{cat,un:0,m2:0,ml:0,m3:0};
+  elems[id]={tipo,cat,q,disc};
+  const t=tipos[tipo]=tipos[tipo]||{cat,un:0,m2:0,ml:0,m3:0,disc};
+  if(disc&&!t.disc)t.disc=disc;
   t.un++; t.m2+=q.m2||0; t.ml+=q.ml||0; t.m3+=q.m3||0;
  }
  for(const k in tipos){const t=tipos[k];t.m2=Math.round(t.m2*100)/100;t.ml=Math.round(t.ml*100)/100;t.m3=Math.round(t.m3*1000)/1000;}
@@ -1408,7 +1474,7 @@ $('btn-items-modelo').onclick=()=>{
   for(const [tipo,t] of Object.entries(tipos)){
    if(P.presupuesto.items.some(it=>it.desc===tipo))continue;
    const evs=ejem[tipo]||[];
-   P.presupuesto.items.push({desc:tipo,cat:t.cat,unidad:'un',qty:t.un,
+   P.presupuesto.items.push({desc:tipo,cat:t.cat,disc:t.disc||'',unidad:'un',qty:t.un,
     qtyAuto:{un:t.un,m2:t.m2,ml:t.ml,m3:t.m3},apuNombre:'',valor:0,
     elems:evs.slice(0,150),nElems:evs.length});
   }
@@ -1421,7 +1487,7 @@ $('btn-items-modelo').onclick=()=>{
  for(const [cat,qty] of Object.entries(c)){
   if(cat==='Espacios')continue;
   if(P.presupuesto.items.some(it=>it.desc===cat))continue;
-  P.presupuesto.items.push({desc:cat,unidad:'un',qty:qty,qtyAuto:{un:qty},apuNombre:'',valor:0});
+  P.presupuesto.items.push({desc:cat,cat:cat,disc:disciplinaMEP(cat,[]),unidad:'un',qty:qty,qtyAuto:{un:qty},apuNombre:'',valor:0});
  }
  renderItems(); autosave();
  flash('Ítems generados por categoría (el IFC no trae tipos) — ajusta cantidades y enlaza APUs');
@@ -1429,6 +1495,110 @@ $('btn-items-modelo').onclick=()=>{
 $('btn-item-add').onclick=()=>{P.presupuesto.items.push({desc:'',unidad:'un',qty:1,qtyAuto:null,apuNombre:'',valor:0});renderItems();autosave();};
 
 function itemTotal(it){return (parseFloat(it.qty)||0)*(parseFloat(it.valor)||0);}
+
+/* ===================== INDICADORES ===================== */
+const DISCIPLINAS=['Hidráulica','Sanitaria','Eléctrica','Gas','Ventilación','Redes (sin disciplina)'];
+/* Tipo de costo de un insumo consolidado. Transporte = nombre con TRANSPORTE / ACARREO / FLETE */
+function tipoCosto(m){
+ const n=String(m.nombre||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+ if(/TRANSPORT|ACARREO|FLETE/.test(n))return 'Transporte';
+ if(m.tipo==='MO')return 'Mano de obra';
+ if(m.tipo==='MQ')return 'Equipos';
+ return 'Materiales';
+}
+function discDeActividad(a){
+ const cnt={};
+ for(const id of (a.elems||[])){ const e=IFC_ELEMS[id]; if(e&&e.disc)cnt[e.disc]=(cnt[e.disc]||0)+1; }
+ const ks=Object.keys(cnt);
+ if(ks.length)return ks.sort((x,y)=>cnt[y]-cnt[x])[0];
+ if(a.disc)return a.disc;
+ const d=disciplinaMEP('',[a.nombre||'']);
+ if(d)return d;
+ return /\bRED(ES)?\b|TUBER|INSTALAC|\bMEP\b|CONDUIT|DUCTO/i.test(a.nombre||'')?'Redes (sin disciplina)':'';
+}
+function calcIndicadores(){
+ renderPresStats();
+ const dir=P.presupuesto.totalDirecto||0;
+ const redes={}; let totRedes=0;
+ const add=(d,v)=>{ if(!d||!(v>0))return; redes[d]=(redes[d]||0)+v; totRedes+=v; };
+ P.actividadesIfc.forEach(a=>add(discDeActividad(a),(a.qty||0)*(a.apuPrecio||0)));
+ P.presupuesto.items.forEach(it=>add(it.disc||disciplinaMEP(it.cat||'',[it.desc||'']),itemTotal(it)));
+ const tipos={'Materiales':0,'Mano de obra':0,'Equipos':0,'Transporte':0};
+ (P.materiales||[]).forEach(m=>{ tipos[tipoCosto(m)]+=(m.cant||0)*(m.precio||0); });
+ const topMat=(P.materiales||[]).map(m=>({nombre:m.nombre,und:m.unidad,cant:m.cant||0,total:(m.cant||0)*(m.precio||0),tc:tipoCosto(m)}))
+  .filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,10);
+ const topAct=[
+  ...P.actividadesIfc.map(a=>({nombre:a.nombre,und:a.apuUnidad||'un',cant:a.qty||0,total:(a.qty||0)*(a.apuPrecio||0),disc:discDeActividad(a)})),
+  ...P.presupuesto.items.map(it=>({nombre:it.desc,und:it.unidad||'un',cant:it.qty||0,total:itemTotal(it),disc:it.disc||disciplinaMEP(it.cat||'',[it.desc||''])}))
+ ].filter(x=>x.total>0).sort((a,b)=>b.total-a.total).slice(0,10);
+ return {dir,redes,totRedes,pctRedes:dir>0?totRedes/dir*100:0,tipos,topMat,topAct};
+}
+const TIPOS_OBRA=[['urbanismo','Urbanismo'],['edificacion','Edificación'],['reforzamiento','Reforzamiento']];
+let COSTOS_M2=null;
+async function cargarCostosM2(){
+ if(COSTOS_M2)return COSTOS_M2;
+ let v=null; try{ if(window.SAAS&&SAAS.loadMeta) v=await SAAS.loadMeta('costos_m2'); }catch(e){}
+ COSTOS_M2=v||{}; return COSTOS_M2;
+}
+const fmtM2=n=>n?('$'+Math.round(n).toLocaleString('es-CO')):'—';
+async function renderIndicadores(){
+ const ind=calcIndicadores();
+ $('ind-stats').innerHTML=`
+  <div class="stat"><span class="lbl">Costo directo</span><span class="val">${fmt(ind.dir)}</span></div>
+  <div class="stat"><span class="lbl">% redes del directo</span><span class="val viol">${ind.pctRedes.toFixed(1)}%</span></div>
+  <div class="stat"><span class="lbl">Costo redes</span><span class="val ok">${fmt(ind.totRedes)}</span></div>
+  <div class="stat"><span class="lbl">Insumos consolidados</span><span class="val new">${(P.materiales||[]).length}</span></div>`;
+ const rows=DISCIPLINAS.filter(d=>ind.redes[d]>0).map(d=>`<tr><td>${d}</td><td style="text-align:right">${fmt(ind.redes[d])}</td><td style="text-align:right;color:var(--viol)">${ind.dir>0?(ind.redes[d]/ind.dir*100).toFixed(1):'0.0'}%</td><td style="text-align:right;color:var(--text-dim)">${ind.totRedes>0?(ind.redes[d]/ind.totRedes*100).toFixed(0):'0'}% de redes</td></tr>`).join('');
+ $('ind-redes').innerHTML=rows
+  ?`<table class="tbl"><thead><tr><th>Disciplina</th><th>Costo</th><th>% del directo</th><th></th></tr></thead><tbody>${rows}<tr style="font-weight:600"><td>Total redes</td><td style="text-align:right">${fmt(ind.totRedes)}</td><td style="text-align:right;color:var(--viol)">${ind.pctRedes.toFixed(1)}%</td><td></td></tr></tbody></table>`
+  :'<div class="empty">Sin redes con APU enlazado todavía — enlaza APUs a tuberías, conduits o uniones en Presupuesto.</div>';
+ $('ind-tipos').innerHTML=['Materiales','Mano de obra','Equipos','Transporte'].map((k,i)=>`<div class="stat"><span class="lbl">${k}</span><span class="val ${['','viol','new','ok'][i]}">${fmt(ind.tipos[k])}</span></div>`).join('');
+ const totMat=Object.values(ind.tipos).reduce((a,b)=>a+b,0);
+ $('tbl-top-mat').querySelector('tbody').innerHTML=ind.topMat.length
+  ?ind.topMat.map((x,i)=>`<tr><td>${i+1}</td><td>${x.nombre}</td><td class="hint">${x.tc}</td><td style="text-align:right">${(x.cant||0).toLocaleString('es-CO')} ${x.und||''}</td><td style="text-align:right;color:var(--accent)">${fmt(x.total)}</td><td style="text-align:right;color:var(--text-dim)">${totMat>0?(x.total/totMat*100).toFixed(1):'0'}%</td></tr>`).join('')
+  :'<tr><td colspan="6" class="hint" style="font-style:italic;padding:10px">Pulsa «Calcular materiales totales» en la pestaña Materiales.</td></tr>';
+ $('tbl-top-act').querySelector('tbody').innerHTML=ind.topAct.length
+  ?ind.topAct.map((x,i)=>`<tr><td>${i+1}</td><td>${x.nombre}</td><td class="hint">${x.disc||'—'}</td><td style="text-align:right">${(x.cant||0).toLocaleString('es-CO')} ${x.und||''}</td><td style="text-align:right;color:var(--accent)">${fmt(x.total)}</td><td style="text-align:right;color:var(--text-dim)">${ind.dir>0?(x.total/ind.dir*100).toFixed(1):'0'}%</td></tr>`).join('')
+  :'<tr><td colspan="6" class="hint" style="font-style:italic;padding:10px">Enlaza APUs a actividades o ítems en Presupuesto.</td></tr>';
+ await renderEstimacion(ind);
+}
+async function renderEstimacion(ind){
+ const ref=await cargarCostosM2();
+ P.estimacion=P.estimacion||{};
+ if(!P.estimacion.edificacion&&P.model.areaTotal)P.estimacion.edificacion=P.model.areaTotal;
+ const tb=$('tbl-est').querySelector('tbody'); tb.innerHTML='';
+ let min=0,max=0,m2=0,redesEsp=0;
+ TIPOS_OBRA.forEach(([k,lab])=>{
+  const r=ref[k]||{}; const a=parseFloat(P.estimacion[k])||0;
+  const lo=a*(parseFloat(r.min)||0), hi=a*(parseFloat(r.max)||0);
+  min+=lo; max+=hi; m2+=a; redesEsp+=a*(parseFloat(r.redes)||0);
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${lab}</td>
+   <td><input class="num" type="number" step="any" value="${a||''}" data-k="${k}" data-f="m2" placeholder="0"></td>
+   <td><input class="num" type="number" value="${r.min||''}" data-k="${k}" data-f="min" placeholder="COP/m²"></td>
+   <td><input class="num" type="number" value="${r.max||''}" data-k="${k}" data-f="max" placeholder="COP/m²"></td>
+   <td><input class="num" type="number" step="any" value="${r.redes||''}" data-k="${k}" data-f="redes" placeholder="%"></td>
+   <td style="text-align:right;color:var(--accent)">${(lo||hi)?fmtM2(lo)+' – '+fmtM2(hi):'—'}</td>`;
+  tb.appendChild(tr);
+ });
+ tb.querySelectorAll('input').forEach(inp=>inp.onchange=()=>{
+  const k=inp.dataset.k,f=inp.dataset.f,v=parseFloat(inp.value)||0;
+  if(f==='m2'){ P.estimacion[k]=v; autosave(); }
+  else { COSTOS_M2[k]=COSTOS_M2[k]||{}; COSTOS_M2[k][f]=v; }
+  renderEstimacion(calcIndicadores());
+ });
+ const out=$('est-out');
+ if(!m2){ out.innerHTML='Escribe los m² por tipo de obra y tus costos de referencia por m² (mín y máx).'; return; }
+ const pctEsp=m2>0?redesEsp/m2:0, realM2=(ind.dir>0&&m2>0)?ind.dir/m2:0;
+ let html=(min||max)?`<b>Rango estimado: <span style="color:var(--accent)">${fmtM2(min)} – ${fmtM2(max)}</span></b> para ${m2.toLocaleString('es-CO')} m²`:'Pon costo/m² mín y máx para ver el rango.';
+ if(realM2){ html+=` · Presupuesto actual: <b>${fmtM2(ind.dir)}</b> (${fmtM2(realM2)}/m²)`;
+  if(min&&max) html+= ind.dir<min?' <span style="color:var(--accent)">por debajo del rango</span>':ind.dir>max?' <span style="color:var(--accent-2)">por encima del rango</span>':' <span style="color:var(--ok)">dentro del rango</span>'; }
+ if(pctEsp) html+=` · Redes esperado (ponderado por área): <b>${pctEsp.toFixed(1)}%</b> vs real <b>${ind.pctRedes.toFixed(1)}%</b>`;
+ out.innerHTML=html;
+}
+$('btn-est-guardar').onclick=async()=>{
+ try{ if(window.SAAS&&SAAS.saveMeta) await SAAS.saveMeta('costos_m2',COSTOS_M2||{}); flash('✓ Costos por m² guardados en tu cuenta'); }catch(e){ flash('No se pudo guardar: '+(e.message||e)); }
+};
 /* estado de plegado del árbol (sesión): categorías abiertas, ejemplares cerrados */
 const TREE={cat:{},act:{}};
 /* ejemplares (instancias) de una actividad: del IFC de la sesión, o los persistidos */
@@ -2493,6 +2663,14 @@ function renderMat(){
   <div class="stat"><span class="lbl">Total a precios base</span><span class="val viol">${fmt(totBase)}</span></div>
   <div class="stat"><span class="lbl">Total al mejor precio</span><span class="val ok">${fmt(totMejor)}</span></div>
   <div class="stat"><span class="lbl">Proveedores</span><span class="val new">${provs.length}/3</span></div>`;
+ // totales del proyecto por tipo de costo (todos los insumos, a precio base)
+ const tc={'Materiales':0,'Mano de obra':0,'Equipos':0,'Transporte':0};
+ (P.materiales||[]).forEach(m=>{ tc[tipoCosto(m)]+=(m.cant||0)*(m.precio||0); });
+ const s2=$('mat-stats2'); if(s2) s2.innerHTML=`
+  <div class="stat"><span class="lbl">Total materiales</span><span class="val">${fmt(tc['Materiales'])}</span></div>
+  <div class="stat"><span class="lbl">Total mano de obra</span><span class="val viol">${fmt(tc['Mano de obra'])}</span></div>
+  <div class="stat"><span class="lbl">Total equipos</span><span class="val new">${fmt(tc['Equipos'])}</span></div>
+  <div class="stat"><span class="lbl">Total transporte</span><span class="val ok">${fmt(tc['Transporte'])}</span></div>`;
 }
 $('btn-mat-calc').onclick=calcMateriales;
 $('btn-mat-cotizar-todo').onclick=()=>{

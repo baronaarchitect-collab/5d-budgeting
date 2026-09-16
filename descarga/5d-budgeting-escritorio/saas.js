@@ -209,6 +209,23 @@ window.SAAS = (function () {
     async loadApuBaseCloud() {
       if (state.mode !== 'firebase' || !state.user) return null;
       try { const s = await F.getDoc(F.doc(db, 'users', state.user.uid, 'meta', 'apubase')); return s.exists() ? JSON.parse(s.data().data) : null; } catch (e) { return null; }
+    },
+
+    /* Metadatos genéricos del usuario (p.ej. tabla de costos por m²): nube + caché local */
+    metaKey(key) { return 'budgeting5d_meta__' + (this.uid || 'local') + '__' + key; },
+    async saveMeta(key, obj) {
+      try { localStorage.setItem(this.metaKey(key), JSON.stringify(obj)); } catch (e) {}
+      if (state.mode !== 'firebase' || !state.user) return false;
+      try { await F.setDoc(F.doc(db, 'users', state.user.uid, 'meta', key), { data: JSON.stringify(obj), updatedAt: new Date().toISOString() }); return true; } catch (e) { return false; }
+    },
+    async loadMeta(key) {
+      if (state.mode === 'firebase' && state.user) {
+        try {
+          const s = await F.getDoc(F.doc(db, 'users', state.user.uid, 'meta', key));
+          if (s.exists()) { const v = JSON.parse(s.data().data); try { localStorage.setItem(this.metaKey(key), JSON.stringify(v)); } catch (e) {} return v; }
+        } catch (e) {}
+      }
+      try { return JSON.parse(localStorage.getItem(this.metaKey(key)) || 'null'); } catch (e) { return null; }
     }
   };
 })();
