@@ -58,11 +58,11 @@
   #est-modal input{background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:6px;font-family:var(--mono);font-size:11px;width:100px}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
-<script src="firebase-config.js?v=8"></script>
-<script src="config.js?v=8"></script>
-<script src="auth.js?v=8"></script>
-<script src="saas.js?v=8"></script>
-<script src="hub.js?v=8"></script>
+<script src="firebase-config.js?v=9"></script>
+<script src="config.js?v=9"></script>
+<script src="auth.js?v=9"></script>
+<script src="saas.js?v=9"></script>
+<script src="hub.js?v=9"></script>
 </head>
 <body>
 <header>
@@ -297,7 +297,7 @@ $('np-crear-hub').onclick=()=>{
   const nombre=$('np-nombre').value.trim()||np.proy.name;
   const m=np.modelo;
   crearProyecto(nombre,{share_id:np.proy.share_id,slug:np.proy.slug,projectName:np.proy.name,
-    model:{id:m.id,name:m.name,file_key:m.file_key,size:m.size||null,updated_at:m.updated_at||null},pending:true});
+    model:{id:m.id,name:m.name,file_key:m.file_key,meta_key:m.meta_key||null,schedules_key:m.schedules_key||null,size:m.size||null,updated_at:m.updated_at||null},pending:true});
 };
 </script>
 </body>

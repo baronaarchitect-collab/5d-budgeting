@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="firebase-config.js?v=8"></script>
-<script src="config.js?v=8"></script>
-<script src="auth.js?v=8"></script>
-<script src="saas.js?v=8"></script>
-<script src="hub.js?v=8"></script>
+<script src="firebase-config.js?v=9"></script>
+<script src="config.js?v=9"></script>
+<script src="auth.js?v=9"></script>
+<script src="saas.js?v=9"></script>
+<script src="hub.js?v=9"></script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -110,6 +110,25 @@
   td.best{color:var(--ok);font-weight:600}
   .apu-link{color:var(--accent-3);cursor:pointer;text-decoration:underline dotted}
   ::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-track{background:var(--bg-0)}::-webkit-scrollbar-thumb{background:var(--line)}
+  /* Cantidades (dashboard como el visor del BIM Hub) */
+  .qchips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 8px}
+  .qchip{padding:3px 8px;border:1px solid var(--line);border-radius:10px;font-size:10px;color:var(--text-dim);cursor:pointer;background:var(--bg-2);user-select:none}
+  .qchip.on{color:var(--text);border-color:var(--viol);background:#231f3a}
+  .qcat{padding:5px 0;border-bottom:1px solid var(--line)}
+  .qcat.off{opacity:.45}
+  .qcat .top{display:flex;align-items:center;gap:8px;font-size:11px}
+  .qcat .top input{margin:0}
+  .qcat .top .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+  .qcat .top .name:hover{color:var(--accent)}
+  .qcat .top .val{color:var(--text);white-space:nowrap}
+  .qcat .bar{height:3px;background:var(--bg-2);margin-top:4px}.qcat .bar div{height:100%;background:var(--viol)}
+  .qtot{display:flex;justify-content:space-between;padding:8px 0;font-size:11px;color:var(--text-dim)}.qtot b{color:var(--accent)}
+  #q-drill{margin-top:8px;border:1px solid var(--line);border-left:3px solid var(--accent);padding:10px;background:var(--bg-1)}
+  #q-drill .back{cursor:pointer;color:var(--accent);font-size:10px}
+  #q-drill h4{font-family:var(--display);font-size:13px;margin:4px 0 2px}
+  #q-drill tr.click{cursor:pointer}#q-drill tr.click:hover td{color:var(--accent)}
+  #q-drill tfoot th{padding:6px 8px;text-align:left;font-size:10px;color:var(--text)}
+  .qnum{text-align:right}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
 </head>
@@ -222,8 +241,23 @@
       </div>
       <p class="hint">Sube el IFC del proyecto (Revit / masas.html) o el JSON exportado desde el editor LifeCity BIM 5D. La app extrae niveles, sótanos, áreas y cantidades por categoría; lo que no venga en el modelo se edita a mano abajo.</p>
       <div class="grid4" id="model-stats"></div>
-      <h3><span class="dot"></span> Cantidades detectadas</h3>
-      <div id="model-counts"><div class="empty">Sin modelo cargado</div></div>
+      <h3><span class="dot"></span> Cantidades <span id="q-fuente" class="hint" style="text-transform:none;letter-spacing:0;font-weight:400"></span></h3>
+      <div id="q-dash" style="display:none">
+        <div class="btnrow" style="align-items:center">
+          <span class="hint">Métrica</span>
+          <select id="q-field" style="background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:5px 6px;font-family:var(--mono);font-size:11px"></select>
+          <span style="flex:1"></span>
+          <button class="btn sm viol" id="q-items" title="Un ítem del presupuesto por cada tipo (categoría · tipo) con las cantidades de Revit"><span class="ic">◈</span> Crear ítems por tipo</button>
+        </div>
+        <div class="hint" style="margin-top:6px">Niveles · <a href="#" id="q-lvl-toggle" style="color:var(--accent)">todos / ninguno</a> · clic en una categoría = desglose por tipo y por nivel · las casillas filtran el visor 3D</div>
+        <div class="qchips" id="q-lvls"></div>
+        <div id="q-cats"></div>
+        <div class="qtot"><span>TOTAL <span id="q-total-lbl"></span></span><b id="q-total">—</b></div>
+        <div id="q-drill" style="display:none"></div>
+      </div>
+      <div id="q-empty" class="empty">Sin modelo cargado</div>
+      <details style="margin-top:8px"><summary class="hint" style="cursor:pointer">Tipos del IFC (un / m² / ml / m³) y resumen por categoría IFC</summary>
+      <div id="model-counts"><div class="empty">Sin modelo cargado</div></div></details>
     </div>
     <div class="box">
       <h3><span class="dot"></span> Esquema volumétrico</h3>
@@ -785,7 +819,7 @@ document.querySelectorAll('.subtab[data-sub]').forEach(b=>b.onclick=()=>{
 const CAT_MAP={WALL:'Muros',WALLSTANDARDCASE:'Muros',SLAB:'Losas',COLUMN:'Columnas',BEAM:'Vigas',DOOR:'Puertas',WINDOW:'Ventanas',STAIR:'Escaleras',STAIRFLIGHT:'Escaleras',ROOF:'Cubiertas',FOOTING:'Cimentación',PILE:'Cimentación',SPACE:'Espacios',COVERING:'Acabados',RAILING:'Barandas',CURTAINWALL:'Muro cortina',MEMBER:'Estructura metálica',PLATE:'Estructura metálica',FLOWTERMINAL:'Aparatos MEP',
  FLOWSEGMENT:'Tubería/red MEP',PIPESEGMENT:'Tubería',DUCTSEGMENT:'Ducto',CABLECARRIERSEGMENT:'Conduit/bandeja',CABLESEGMENT:'Cableado',CONDUITSEGMENT:'Conduit',
  FLOWFITTING:'Uniones/accesorios MEP',PIPEFITTING:'Uniones de tubería',DUCTFITTING:'Uniones de ducto',CABLECARRIERFITTING:'Uniones de conduit',JUNCTIONBOX:'Cajas/uniones',
- SANITARYTERMINAL:'Aparatos sanitarios',VALVE:'Válvulas'};
+ SANITARYTERMINAL:'Aparatos sanitarios',VALVE:'Válvulas',FLOWCONTROLLER:'Válvulas/controles MEP',FLOWMOVINGDEVICE:'Bombas/ventiladores',FLOWSTORAGEDEVICE:'Tanques',FLOWTREATMENTDEVICE:'Equipos de tratamiento',ENERGYCONVERSIONDEVICE:'Equipos MEP',DISTRIBUTIONFLOWELEMENT:'Elementos MEP',DISTRIBUTIONCONTROLELEMENT:'Controles MEP',LIGHTFIXTURE:'Luminarias',ELECTRICAPPLIANCE:'Aparatos eléctricos',AIRTERMINAL:'Rejillas/difusores',BUILDINGELEMENTPROXY:'Modelos genéricos',BUILDINGELEMENTPART:'Partes de elementos',FURNISHINGELEMENT:'Mobiliario',FURNITURE:'Mobiliario',REINFORCINGBAR:'Refuerzo',REINFORCINGMESH:'Malla de refuerzo',RAMP:'Rampas',RAMPFLIGHT:'Rampas'};
 /* Categorías MEP que se separan por DIÁMETRO (cada diámetro = actividad/ítem nuevo) */
 const MEP_SPLIT=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CABLESEGMENT|CONDUITSEGMENT|FLOWFITTING|PIPEFITTING|DUCTFITTING|CABLECARRIERFITTING|JUNCTIONBOX|VALVE|DISTRIBUTIONFLOWELEMENT|DISTRIBUTIONELEMENT|FLOWCONTROLLER)$/;
 /* Tubos propiamente dichos: si no se halla el diámetro se marca «Ø s/d» para que se note. */
@@ -793,7 +827,7 @@ const MEP_TUBO=/^(FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLECARRIERSEGMENT|CONDUI
 /* Disciplina de redes: del parámetro Sistema/System del IFC, del nombre del tipo (PVC-S, PVC-P, EMT…) o de la categoría */
 const ES_MEP_ELEM=/^(FLOWTERMINAL|SANITARYTERMINAL)$/;
 function disciplinaMEP(cat, textos){
- const s=(textos||[]).filter(Boolean).join(' | ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+ const s=(textos||[]).filter(Boolean).join(' | ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/_/g,' ');
  if(/ELECTR|POWER|ILUMIN|LIGHT|VOLT|TOMACORR|TOMA ELEC|CONDUIT|\bEMT\b|PVC-E\b|CABLE|COMUNIC|\bDATA\b|TELEC|CCTV|ALARMA/.test(s))return 'Eléctrica';
  if(/\bGAS\b|\bGLP\b|GAS NATURAL/.test(s))return 'Gas';
  if(/SANIT|AGUAS NEGRAS|AGUAS LLUVIA|PLUVIAL|DESAG|ALCANT|DRENAJE|RESIDUAL|PVC-S\b|PVC S\b|SEWER|WASTE|STORM/.test(s))return 'Sanitaria';
@@ -871,7 +905,17 @@ function indexIfcEntities(text){
  while((m=re.exec(text))){ents[m[1]]={t:m[2],p:m[3]};}
  return ents;
 }
-const getStrs=p=>[...p.matchAll(/'((?:[^']|'')*)'/g)].map(x=>x[1].replace(/''/g,"'"));
+/* cadenas IFC: '' → ', \X\hh (ISO-8859-1), \X2\hhhh…\X0\ (UTF-16) y \S\c → texto normal ("Tuber\X\EDa" = "Tubería") */
+function ifcUnescape(s){
+ if(s.indexOf('\\')<0)return s.replace(/''/g,"'");
+ return s.replace(/''/g,"'")
+  .replace(/\\X2\\([0-9A-F]+)\\X0\\/g,(m,h)=>h.match(/.{1,4}/g).map(c=>String.fromCharCode(parseInt(c,16))).join(''))
+  .replace(/\\X4\\([0-9A-F]+)\\X0\\/g,(m,h)=>h.match(/.{1,8}/g).map(c=>String.fromCodePoint(parseInt(c,16))).join(''))
+  .replace(/\\X\\([0-9A-F]{2})/g,(m,h)=>String.fromCharCode(parseInt(h,16)))
+  .replace(/\\S\\(.)/g,(m,c)=>String.fromCharCode(c.charCodeAt(0)+128))
+  .replace(/\\P[A-I]\\/g,'').replace(/\\\\/g,'\\');
+}
+const getStrs=p=>[...p.matchAll(/'((?:[^']|'')*)'/g)].map(x=>ifcUnescape(x[1]));
 const getRefs=p=>[...p.matchAll(/#(\d+)/g)].map(x=>x[1]);
 
 /* ---- TIPOS de Revit + cantidades (un / m² / ml / m³) desde quantity sets ---- */
@@ -997,7 +1041,7 @@ function parseTiposCantidades(ents){
  }
  // 4) tipo de Revit por elemento (Name sin el id de instancia) + agregado por tipo
  //     MEP (tubería/conduit/uniones) se separa por DIÁMETRO → cada diámetro es un tipo/ítem nuevo
- const tipos={}, elems={};
+ const tipos={}, elems={}, tag2id={};
  let mepCon=0, mepSin=0; const mepParams={};
  for(const id in ents){
   const e=ents[id];
@@ -1034,14 +1078,29 @@ function parseTiposCantidades(ents){
    disc=disciplinaMEP(cat,txt);
   }
   const q=elemQ[id]||{};
-  elems[id]={tipo,cat,q,disc};
+  // IfcElement.Tag = ElementId de Revit (última cadena numérica) → enlaza con la metadata del BIM Hub
+  const tag=(strs.length>=3&&/^\d+$/.test(strs[strs.length-1]))?strs[strs.length-1]:'';
+  if(tag)tag2id[tag]=id;
+  elems[id]={tipo,cat,q,disc,tag};
   const t=tipos[tipo]=tipos[tipo]||{cat,un:0,m2:0,ml:0,m3:0,disc};
   if(disc&&!t.disc)t.disc=disc;
   t.un++; t.m2+=q.m2||0; t.ml+=q.ml||0; t.m3+=q.m3||0;
  }
  for(const k in tipos){const t=tipos[k];t.m2=Math.round(t.m2*100)/100;t.ml=Math.round(t.ml*100)/100;t.m3=Math.round(t.m3*1000)/1000;}
  const topParams=Object.keys(mepParams).sort((a,b)=>mepParams[b]-mepParams[a]).slice(0,18);
- return {tipos,elems,mepDiag:{conDiam:mepCon,sinDiam:mepSin,params:topParams}};
+ return {tipos,elems,tag2id,mepDiag:{conDiam:mepCon,sinDiam:mepSin,params:topParams}};
+}
+/* nivel (IfcBuildingStorey) de cada elemento vía IfcRelContainedInSpatialStructure */
+function parseNivelesElem(ents){
+ const lvl={};
+ for(const id in ents){
+  if(ents[id].t!=='RELCONTAINEDINSPATIALSTRUCTURE')continue;
+  const refs=getRefs(ents[id].p); if(refs.length<2)continue;
+  const st=ents[refs[refs.length-1]]; if(!st)continue;
+  const name=(getStrs(st.p)[1]||st.t)||'';
+  for(let i=0;i<refs.length-1;i++)lvl[refs[i]]=name;
+ }
+ return lvl;
 }
 
 /* unidad del APU → clave de cantidad del IFC: m2=área, ml=longitud, m3=volumen, un=conteo */
@@ -1131,8 +1190,10 @@ function procesarIfc(buf,fileName){
    const ents=indexIfcEntities(text);
    const tq=parseTiposCantidades(ents);
    IFC_ELEMS=tq.elems;
+   IFC_TAG2ID=tq.tag2id||{};
    P.model.tipos=tq.tipos;
    P.model.mepDiag=tq.mepDiag;
+   setModelQ(buildQFromIfc(tq,parseNivelesElem(ents),f.name)); // dashboard de cantidades (se reemplaza por la metadata de Revit si viene del BIM Hub)
    // actividades PSI_* (cronograma 4D exportado desde Revit)
    const acts=parsePsiActivities(ents);
    if(acts.length){
@@ -1188,7 +1249,7 @@ async function traerDelHub(){
   try{
    const pr=await HUB.project(h.share_id);
    const cur=(pr.models||[]).find(x=>x.id===h.model.id);
-   if(cur)m={id:cur.id,name:cur.name,file_key:cur.file_key,size:cur.size,updated_at:cur.updated_at};
+   if(cur)m={id:cur.id,name:cur.name,file_key:cur.file_key,meta_key:cur.meta_key||null,schedules_key:cur.schedules_key||null,size:cur.size,updated_at:cur.updated_at};
    h.projectName=pr.name||h.projectName;
   }catch(e){ if(e.status===403||e.status===404)throw e; }
   prog.style.display=''; bar.style.width='0';
@@ -1200,6 +1261,16 @@ async function traerDelHub(){
   if(procesarIfc(buf,nombre)){
    P.hub={...h,model:m,pending:false,importedAt:new Date().toISOString()};
    renderHubBox(); autosave();
+   // Cantidades reales de Revit (categoría, familia, tipo, nivel y tablas de cantidades) publicadas por el plugin
+   if(m.meta_key){
+    try{
+     const dec=b=>JSON.parse(new TextDecoder('utf-8').decode(b));
+     const meta=dec(await HUB.download(h.share_id,m.meta_key));
+     let sched=null; if(m.schedules_key){ try{ sched=dec(await HUB.download(h.share_id,m.schedules_key)); }catch(e){} }
+     const q=buildQFromHub(meta,sched,m.name||m.id);
+     if(q.rows.length){ setModelQ(q); autosave(); flash('Cantidades de Revit cargadas: '+meta.length.toLocaleString('es-CO')+' elementos, '+q.cats+' categorías ✓'); }
+    }catch(e){ flash('No se pudo leer la metadata de Revit del BIM Hub: '+String(e.message||e).slice(0,80)); }
+   }
   }
  }catch(e){
   flash('BIM Hub: '+String(e.message||e).slice(0,140),6000);
@@ -1355,8 +1426,204 @@ function renderModel(){
    ks.sort().map(k=>`<tr><td>${k}</td><td>${m.cantidades[k]}</td></tr>`).join('')+'</tbody></table>';
  }
  c.innerHTML=html||'<div class="empty">Sin modelo cargado</div>';
+ renderQDash();
  draw3D();
 }
+
+/* ===================== CANTIDADES — dashboard como el visor del BIM Hub =====================
+   Fuente preferida: meta.json del plugin de Revit (categoría, familia, tipo, nivel, campos de las
+   tablas de cantidades). Sin BIM Hub: se arma desde el propio IFC (categoría IFC, tipo, nivel, qsets).
+   P.model.hubQ = {fuente, modelo, units, fields, rows:[{cat,fam,typ,lvl,n,q:{campo:valor},tags:[…≤300],nTags}]} */
+let IFC_TAG2ID={};          // Tag de Revit → expressID (sesión)
+let Q_TAGS={};              // fila → todos los tags (sesión; en el proyecto se guardan hasta 300 por fila)
+const Q_SEL={src:null,lvls:new Set(),cats:new Set(),field:'Conteo',allLvls:[],allCats:[]};
+const TAGS_MAX=300;
+const fmtQ=n=>{ n=+n||0; const a=Math.abs(n); const d=a>=100?0:a>=1?2:3; return n.toLocaleString('es-CO',{maximumFractionDigits:d}); };
+const normU=u=>String(u||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+// factor a metros / m² / m³ según la etiqueta de unidad del proyecto de Revit
+function factorLen(u){ u=normU(u); if(/mil[ií]?met|^mm$|\bmm\b/.test(u))return .001; if(/cent[ií]?met|^cm$|\bcm\b/.test(u))return .01; if(/\bft\b|pie|feet|foot/.test(u))return .3048; if(/\bin\b|pulg|inch/.test(u))return .0254; return 1; }
+function factorArea(u){ u=normU(u); if(/mm/.test(u))return 1e-6; if(/cm/.test(u))return 1e-4; if(/ft|pie|feet|foot/.test(u))return .092903; if(/in|pulg|inch/.test(u))return 6.4516e-4; return 1; }
+function factorVol(u){ u=normU(u); if(/mm/.test(u))return 1e-9; if(/cm/.test(u))return 1e-6; if(/ft|pie|feet|foot/.test(u))return .0283168; if(/in|pulg|inch/.test(u))return 1.6387e-5; if(/litro|liter|\bl\b/.test(u))return .001; return 1; }
+
+function qRowsFinish(map,fuente,modelo,units,fieldSet){
+ const rows=[]; Q_TAGS={};
+ let i=0;
+ for(const r of map.values()){
+  for(const k in r.q)r.q[k]=Math.round(r.q[k]*1000)/1000;
+  Q_TAGS[i]=r.tags;
+  rows.push({cat:r.cat,fam:r.fam,typ:r.typ,lvl:r.lvl,n:r.n,q:r.q,tags:r.tags.slice(0,TAGS_MAX),nTags:r.tags.length});
+  i++;
+ }
+ const fields=['Conteo',...[...fieldSet].filter(f=>f!=='Conteo').sort((a,b)=>a.localeCompare(b,'es'))];
+ return {fuente,modelo,units,fields,rows,cats:new Set(rows.map(r=>r.cat)).size,at:new Date().toISOString()};
+}
+/* desde el IFC subido a mano */
+function buildQFromIfc(tq,lvlOf,fileName){
+ const map=new Map(), fs=new Set(['Conteo']);
+ for(const id in tq.elems){
+  const e=tq.elems[id]; if(!e||e.cat==='Espacios')continue;
+  const typ=e.tipo||'', fam=typ.includes(':')?typ.split(':')[0]:'', lvl=lvlOf[id]||'Sin nivel';
+  const k=e.cat+'\u0001'+typ+'\u0001'+lvl;
+  let r=map.get(k); if(!r){ r={cat:e.cat,fam,typ,lvl,n:0,q:{Conteo:0},tags:[]}; map.set(k,r); }
+  r.n++; r.q.Conteo++;
+  const q=e.q||{};
+  if(q.ml>0){ r.q.Longitud=(r.q.Longitud||0)+q.ml; fs.add('Longitud'); }
+  if(q.m2>0){ r.q['Área']=(r.q['Área']||0)+q.m2; fs.add('Área'); }
+  if(q.m3>0){ r.q.Volumen=(r.q.Volumen||0)+q.m3; fs.add('Volumen'); }
+  r.tags.push(id); // expressIDs
+ }
+ return qRowsFinish(map,'ifc',fileName||'',{Longitud:'m','Área':'m²',Volumen:'m³'},fs);
+}
+/* desde la metadata del plugin de Revit (BIM Hub): [{tag,cat,fam,typ,lvl,q:{Conteo,Longitud,Área,Volumen,…}}] */
+function buildQFromHub(meta,sched,modelo){
+ const map=new Map(), fs=new Set(['Conteo']);
+ const units={...((sched&&sched.units)||{})};
+ for(const s of ((sched&&sched.schedules)||[]))for(const f of (s.fields||[]))if(f.name&&f.unit&&!units[f.name])units[f.name]=f.unit;
+ for(const el of (meta||[])){
+  if(!el||!el.cat)continue;
+  const cat=String(el.cat), fam=String(el.fam||''), typ=String(el.typ||''), lvl=String(el.lvl||'')||'Sin nivel';
+  const k=cat+'\u0001'+typ+'\u0001'+lvl;
+  let r=map.get(k); if(!r){ r={cat,fam,typ,lvl,n:0,q:{Conteo:0},tags:[]}; map.set(k,r); }
+  r.n++;
+  const q=el.q||{}; let hasC=false;
+  for(const f in q){ const v=+q[f]; if(!isFinite(v))continue; r.q[f]=(r.q[f]||0)+v; fs.add(f); if(f==='Conteo')hasC=true; }
+  if(!hasC)r.q.Conteo++;
+  if(el.tag!=null)r.tags.push(String(el.tag));
+ }
+ return qRowsFinish(map,'hub',modelo||'',units,fs);
+}
+function setModelQ(q){
+ P.model.hubQ=q;
+ Q_SEL.src=null; // fuerza re-inicializar la selección
+ renderQDash();
+}
+function qUnit(f){ const u=(P.model.hubQ&&P.model.hubQ.units)||{}; return u[f]||''; }
+function qInitSel(){
+ const Q=P.model.hubQ;
+ if(Q_SEL.src===Q)return;
+ Q_SEL.src=Q;
+ Q_SEL.allLvls=[...new Set(Q.rows.map(r=>r.lvl))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
+ Q_SEL.allCats=[...new Set(Q.rows.map(r=>r.cat))].sort((a,b)=>a.localeCompare(b,'es'));
+ Q_SEL.lvls=new Set(Q_SEL.allLvls); Q_SEL.cats=new Set(Q_SEL.allCats);
+ Q_SEL.field=Q.fields.includes(Q_SEL.field)?Q_SEL.field:'Conteo';
+ $('q-drill').style.display='none';
+}
+const qRowsSel=()=>P.model.hubQ.rows.filter(r=>Q_SEL.lvls.has(r.lvl));
+const qVal=(r,f)=>f==='Conteo'?r.n:(+(r.q&&r.q[f])||0);
+function renderQDash(){
+ const Q=P.model.hubQ, dash=$('q-dash'); if(!dash)return;
+ if(!Q||!Q.rows||!Q.rows.length){ dash.style.display='none'; $('q-empty').style.display=''; $('q-fuente').textContent=''; return; }
+ dash.style.display=''; $('q-empty').style.display='none';
+ qInitSel();
+ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const nEl=Q.rows.reduce((a,r)=>a+r.n,0);
+ $('q-fuente').innerHTML=Q.fuente==='hub'
+  ?` · <span style="color:var(--viol)">metadata de Revit (BIM Hub)</span> · ${nEl.toLocaleString('es-CO')} elementos`
+  :` · leídas del IFC · ${nEl.toLocaleString('es-CO')} elementos`;
+ // métrica
+ const sel=$('q-field');
+ sel.innerHTML=Q.fields.map(f=>`<option value="${esc(f)}">${esc(f)}${qUnit(f)?' ('+esc(qUnit(f))+')':''}</option>`).join('');
+ sel.value=Q_SEL.field;
+ sel.onchange=()=>{ Q_SEL.field=sel.value; renderQCats(); $('q-drill').style.display='none'; };
+ // niveles
+ const lv=$('q-lvls'); lv.innerHTML='';
+ Q_SEL.allLvls.forEach(l=>{
+  const c=document.createElement('span'); c.className='qchip'+(Q_SEL.lvls.has(l)?' on':''); c.textContent=l;
+  c.onclick=()=>{ Q_SEL.lvls.has(l)?Q_SEL.lvls.delete(l):Q_SEL.lvls.add(l); c.classList.toggle('on'); renderQCats(); applyQFilter3D(); };
+  lv.appendChild(c);
+ });
+ $('q-lvl-toggle').onclick=e=>{ e.preventDefault(); const all=Q_SEL.lvls.size===Q_SEL.allLvls.length; Q_SEL.lvls.clear(); if(!all)Q_SEL.allLvls.forEach(l=>Q_SEL.lvls.add(l)); renderQDash(); applyQFilter3D(); };
+ renderQCats();
+}
+function renderQCats(){
+ const box=$('q-cats'); box.innerHTML='';
+ const f=Q_SEL.field, agg=new Map();
+ for(const r of qRowsSel())agg.set(r.cat,(agg.get(r.cat)||0)+qVal(r,f));
+ const max=Math.max(1,...agg.values()); let total=0;
+ Q_SEL.allCats.forEach(c=>{
+  const v=agg.get(c)||0; total+=v;
+  const row=document.createElement('div'); row.className='qcat'+(Q_SEL.cats.has(c)?'':' off');
+  const top=document.createElement('div'); top.className='top';
+  const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=Q_SEL.cats.has(c);
+  cb.onchange=()=>{ cb.checked?Q_SEL.cats.add(c):Q_SEL.cats.delete(c); row.classList.toggle('off',!cb.checked); applyQFilter3D(); };
+  const nm=document.createElement('span'); nm.className='name'; nm.textContent=c; nm.title=c; nm.onclick=()=>openQCat(c);
+  const val=document.createElement('span'); val.className='val'; val.textContent=fmtQ(v);
+  top.append(cb,nm,val);
+  const bar=document.createElement('div'); bar.className='bar'; const bi=document.createElement('div'); bi.style.width=(v/max*100)+'%'; bar.appendChild(bi);
+  row.append(top,bar); box.appendChild(row);
+ });
+ $('q-total').textContent=fmtQ(total)+(qUnit(f)?' '+qUnit(f):'');
+ $('q-total-lbl').textContent=f==='Conteo'?'elementos':f;
+}
+function qGroup(rows,key){
+ const m=new Map();
+ for(const r of rows){ const k=r[key]||'—'; let g=m.get(k); if(!g){ g={k,count:0,val:0}; m.set(k,g); } g.count+=r.n; g.val+=qVal(r,Q_SEL.field); }
+ return [...m.values()];
+}
+function qTable(rows,firstCol,cls){
+ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const total=rows.reduce((s,r)=>s+r.val,0), count=rows.reduce((s,r)=>s+r.count,0);
+ return `<table class="tbl" style="width:100%"><thead><tr><th>${firstCol}</th><th class="qnum">Conteo</th><th class="qnum">${esc(Q_SEL.field)}</th></tr></thead><tbody>`
+  +rows.map(r=>`<tr class="${cls}" data-k="${esc(r.k)}"><td>${esc(r.k)}</td><td class="qnum">${fmtQ(r.count)}</td><td class="qnum">${fmtQ(r.val)}</td></tr>`).join('')
+  +`</tbody><tfoot><tr><th>Total</th><th class="qnum">${fmtQ(count)}</th><th class="qnum">${fmtQ(total)}</th></tr></tfoot></table>`;
+}
+function openQCat(cat){
+ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const rows=qRowsSel().filter(r=>r.cat===cat), u=qUnit(Q_SEL.field), d=$('q-drill');
+ d.innerHTML=`<span class="back" id="q-drill-x">✕ cerrar</span><h4>${esc(cat)}</h4><div class="hint">Métrica: <b>${esc(Q_SEL.field)}</b>${u?' ('+esc(u)+')':''} · ${rows.reduce((a,r)=>a+r.n,0)} elemento(s) · clic en un tipo = desglose por nivel</div>`
+  +qTable(qGroup(rows,'typ').sort((a,b)=>b.val-a.val),'Tipo','click');
+ d.style.display='';
+ $('q-drill-x').onclick=()=>d.style.display='none';
+ d.querySelectorAll('tr.click').forEach(tr=>tr.onclick=()=>openQTyp(cat,tr.dataset.k));
+}
+function openQTyp(cat,typ){
+ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const rows=qRowsSel().filter(r=>r.cat===cat&&(r.typ||'—')===typ), d=$('q-drill');
+ d.innerHTML=`<span class="back" id="q-drill-back">◂ ${esc(cat)}</span><h4>${esc(typ)}</h4><div class="hint">${esc(cat)} · Métrica: <b>${esc(Q_SEL.field)}</b></div>`
+  +qTable(qGroup(rows,'lvl').sort((a,b)=>a.k.localeCompare(b.k,'es',{numeric:true})),'Nivel','');
+ $('q-drill-back').onclick=()=>openQCat(cat);
+}
+/* expressIDs del IFC de una fila (hub: tags de Revit → IFC_TAG2ID; ifc: ya son expressIDs) */
+function qRowIds(r,i){
+ const Q=P.model.hubQ, tags=(Q_TAGS[i]&&Q_TAGS[i].length)?Q_TAGS[i]:(r.tags||[]);
+ if(Q.fuente!=='hub')return tags;
+ const out=[]; for(const t of tags){ const id=IFC_TAG2ID[t]; if(id)out.push(id); } return out;
+}
+/* filtro del visor 3D por categorías y niveles marcados */
+function applyQFilter3D(){
+ const Q=P.model.hubQ; if(!Q||!IFC_MESHES.length)return;
+ const all=Q_SEL.cats.size===Q_SEL.allCats.length&&Q_SEL.lvls.size===Q_SEL.allLvls.length;
+ if(all){ IFC_MESHES.forEach(x=>x.mesh.visible=true); return; }
+ const vis=new Set();
+ Q.rows.forEach((r,i)=>{ if(Q_SEL.cats.has(r.cat)&&Q_SEL.lvls.has(r.lvl))for(const id of qRowIds(r,i))vis.add(String(id)); });
+ IFC_MESHES.forEach(x=>x.mesh.visible=vis.has(String(x.id)));
+}
+/* ítems del presupuesto: uno por categoría · tipo, con cantidades de Revit en un / ml / m² / m³ */
+$('q-items').onclick=()=>{
+ const Q=P.model.hubQ; if(!Q)return;
+ const fl=factorLen(qUnit('Longitud')), fa=factorArea(qUnit('Área')), fv=factorVol(qUnit('Volumen'));
+ const g=new Map();
+ Q.rows.forEach((r,i)=>{
+  if(!Q_SEL.cats.has(r.cat)||!Q_SEL.lvls.has(r.lvl))return;
+  const desc=Q.fuente==='hub'&&r.fam&&r.typ&&!r.typ.startsWith(r.fam)?r.fam+':'+r.typ:(r.typ||r.cat);
+  const k=r.cat+'\u0001'+desc;
+  let it=g.get(k); if(!it){ it={desc,cat:r.cat,fam:r.fam,typ:r.typ,un:0,ml:0,m2:0,m3:0,ids:[]}; g.set(k,it); }
+  it.un+=r.n; it.ml+=(+(r.q&&r.q.Longitud)||0)*fl; it.m2+=(+(r.q&&r.q['Área'])||0)*fa; it.m3+=(+(r.q&&r.q.Volumen)||0)*fv;
+  if(it.ids.length<TAGS_MAX)it.ids.push(...qRowIds(r,i).slice(0,TAGS_MAX-it.ids.length));
+ });
+ let n=0;
+ for(const it of g.values()){
+  if(P.presupuesto.items.some(x=>x.desc===it.desc&&(x.cat||'')===it.cat))continue;
+  const qtyAuto={un:it.un,ml:Math.round(it.ml*100)/100,m2:Math.round(it.m2*100)/100,m3:Math.round(it.m3*1000)/1000};
+  P.presupuesto.items.push({desc:it.desc,cat:it.cat,disc:disciplinaMEP(it.cat,[it.typ,it.fam]),unidad:'un',qty:it.un,qtyAuto,
+   apuNombre:'',valor:0,elems:it.ids.slice(0,150),nElems:it.un,revit:{cat:it.cat,fam:it.fam,typ:it.typ}});
+  n++;
+ }
+ if(!n)return flash('Todos esos tipos ya están en el presupuesto');
+ renderItems(); autosave();
+ flash(n+' ítems creados por tipo (categoría · tipo de Revit) — elige la unidad y la cantidad se toma de Revit; enlaza el APU con ⊕');
+ const b=document.querySelector('.tabbtn[data-tab="presupuesto"]'); if(b)b.click();
+};
 
 /* ============ ÓRBITA reutilizable: pivote-al-clic + zoom + pan ============ */
 function makePivotMarker(){
