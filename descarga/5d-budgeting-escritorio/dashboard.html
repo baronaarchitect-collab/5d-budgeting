@@ -38,6 +38,18 @@
   .pill.warn{background:rgba(244,185,66,.18);color:var(--accent)}
   .empty{color:var(--text-dim);padding:40px;text-align:center;font-style:italic;border:1px dashed var(--line)}
   .hint{font-size:10px;color:var(--text-dim);line-height:1.6}
+  #np-modal{display:none;position:fixed;inset:0;background:rgba(5,8,13,.82);backdrop-filter:blur(4px);z-index:900;align-items:center;justify-content:center}
+  #np-modal .bx{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:22px;width:min(640px,94vw);max-height:92vh;overflow:auto;display:flex;flex-direction:column;gap:12px}
+  #np-modal input[type=text]{background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:9px 10px;font-family:var(--mono);font-size:12px;width:100%}
+  #np-modal input[type=text]:focus{outline:none;border-color:var(--accent)}
+  #np-modal .sec{border:1px solid var(--line);border-left:3px solid var(--viol);padding:12px;display:flex;flex-direction:column;gap:9px}
+  #np-modal .lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)}
+  #np-lista{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow:auto}
+  .np-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-2);border:1px solid var(--line);cursor:pointer;font-size:11px}
+  .np-row:hover{border-color:var(--accent)}
+  .np-row.on{border-color:var(--viol);background:#231f3a}
+  .np-row .g{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .np-row .d{color:var(--text-dim);font-size:10px;white-space:nowrap}
   #est-modal{display:none;position:fixed;inset:0;background:rgba(5,8,13,.82);backdrop-filter:blur(4px);z-index:900;align-items:center;justify-content:center}
   #est-modal .bx{background:var(--bg-1);border:1px solid var(--line);border-radius:14px;padding:22px;width:min(600px,94vw)}
   #est-modal table{width:100%;border-collapse:collapse;margin-top:10px;font-size:11px}
@@ -46,10 +58,11 @@
   #est-modal input{background:var(--bg-0);border:1px solid var(--line);color:var(--text);padding:6px;font-family:var(--mono);font-size:11px;width:100px}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap">
-<script src="firebase-config.js?v=7"></script>
-<script src="config.js?v=7"></script>
-<script src="auth.js?v=7"></script>
-<script src="saas.js?v=7"></script>
+<script src="firebase-config.js?v=8"></script>
+<script src="config.js?v=8"></script>
+<script src="auth.js?v=8"></script>
+<script src="saas.js?v=8"></script>
+<script src="hub.js?v=8"></script>
 </head>
 <body>
 <header>
@@ -68,6 +81,34 @@
   <div id="grid"><div class="empty">Cargando…</div></div>
   <p class="hint" id="foot"></p>
 </main>
+<div id="np-modal">
+  <div class="bx">
+    <div style="display:flex;align-items:center;gap:10px"><b style="font-family:var(--display);font-size:15px">Nuevo proyecto</b><span style="flex:1"></span><button class="btn" id="np-x">✕</button></div>
+    <div><div class="lbl" style="margin-bottom:5px">Nombre del proyecto</div><input type="text" id="np-nombre" placeholder="Ej: Edificio San Fernando" maxlength="120"></div>
+    <div class="sec">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="lbl" style="flex:1">☁ Traer un modelo publicado desde Revit (BIM Hub)</span>
+        <span class="hint" id="np-quien"></span>
+        <button class="btn" id="np-conectar" style="display:none"><span class="ic">G</span> Conectar con Google</button>
+        <button class="btn" id="np-salir" style="display:none" title="Usar otra cuenta del BIM Hub">Cambiar cuenta</button>
+      </div>
+      <div class="hint" id="np-estado"></div>
+      <div id="np-lista"></div>
+      <div id="np-link-box" style="display:none;gap:6px;align-items:center">
+        <input type="text" id="np-link" placeholder="¿No aparece? Pega el link del proyecto (…/p/código)">
+        <button class="btn" id="np-link-go">Buscar</button>
+      </div>
+      <div id="np-modelos-box" style="display:none;flex-direction:column;gap:6px">
+        <div class="lbl">Modelo (IFC) a presupuestar</div>
+        <div id="np-modelos" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn" id="np-vacio">Crear vacío</button>
+      <button class="btn primary" id="np-crear-hub" disabled style="opacity:.5"><span class="ic">☁</span> Crear con el modelo del BIM Hub</button>
+    </div>
+  </div>
+</div>
 <div id="est-modal">
   <div class="bx">
     <div style="display:flex;align-items:center;gap:10px"><b style="font-family:var(--display);font-size:15px">⚡ Estimación rápida por m²</b><span style="flex:1"></span><button class="btn" id="est-x">✕</button></div>
@@ -166,12 +207,97 @@ async function render(){
   }
 }
 
-$('btn-nuevo').onclick=async()=>{
-  const nombre=prompt('Nombre del proyecto (ej: Edificio San Fernando):');
-  if(!nombre)return;
-  const id=nombre.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')+'_'+Date.now().toString(36);
-  await SAAS.saveProject(id,{id,nombre,savedAt:new Date().toISOString()});
+/* ---------- Nuevo proyecto: vacío o desde un modelo del BIM Hub ---------- */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const mb=n=>n?(n/1048576>=10?Math.round(n/1048576):(n/1048576).toFixed(1))+' MB':'';
+const np={proy:null,modelo:null,nombreAuto:''};
+
+async function crearProyecto(nombre,hub){
+  const id=(nombre.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')||'proyecto')+'_'+Date.now().toString(36);
+  const data={id,nombre,savedAt:new Date().toISOString()};
+  if(hub)data.hub=hub;
+  await SAAS.saveProject(id,data);
   location.href='presupuesto.html?id='+encodeURIComponent(id);
+}
+function npListo(){
+  const ok=!!(np.proy&&np.modelo);
+  const b=$('np-crear-hub'); b.disabled=!ok; b.style.opacity=ok?1:.5;
+}
+function npElegirProyecto(share,row){
+  np.proy=null; np.modelo=null; npListo();
+  document.querySelectorAll('#np-lista .np-row').forEach(r=>r.classList.toggle('on',r===row));
+  $('np-modelos-box').style.display='flex';
+  $('np-modelos').innerHTML='<div class="hint">Leyendo modelos…</div>';
+  HUB.project(share).then(p=>{
+    np.proy=p;
+    const ms=p.models||[];
+    if(!$('np-nombre').value.trim()||$('np-nombre').value===np.nombreAuto){ $('np-nombre').value=np.nombreAuto=p.name||''; }
+    if(!ms.length){ $('np-modelos').innerHTML='<div class="hint">Este proyecto aún no tiene modelos publicados.</div>'; return; }
+    $('np-modelos').innerHTML='';
+    ms.forEach(m=>{
+      const r=document.createElement('div'); r.className='np-row';
+      r.innerHTML=`<span class="g">${esc(m.name||m.id)}</span><span class="d">${mb(m.size)}${m.updated_at?' · '+esc(String(m.updated_at).slice(0,10)):''}</span>`;
+      r.onclick=()=>{ np.modelo=m; document.querySelectorAll('#np-modelos .np-row').forEach(x=>x.classList.toggle('on',x===r)); npListo(); };
+      $('np-modelos').appendChild(r);
+      if(ms.length===1)r.onclick();
+    });
+  }).catch(e=>{ $('np-modelos').innerHTML='<div class="hint" style="color:var(--accent-2)">'+esc(e.message||e)+'</div>'; });
+}
+async function npCargar(){
+  np.proy=null; np.modelo=null; npListo();
+  $('np-lista').innerHTML=''; $('np-modelos-box').style.display='none'; $('np-link-box').style.display='none';
+  $('np-conectar').style.display='none'; $('np-salir').style.display='none'; $('np-quien').textContent='';
+  $('np-estado').textContent='Conectando con el BIM Hub…';
+  try{
+    await HUB.init();
+    if(!HUB.user){
+      $('np-estado').textContent='Entra con la cuenta de Google que usas en el BIM Hub para ver los proyectos publicados desde Revit.';
+      $('np-conectar').style.display='';
+      return;
+    }
+    $('np-quien').textContent=HUB.user.email; $('np-salir').style.display='';
+    const ps=await HUB.projects();
+    $('np-link-box').style.display='flex';
+    $('np-estado').textContent=ps.length?'Elige el proyecto:':'Tu cuenta aún no tiene proyectos en el BIM Hub. Pega el link de uno.';
+    ps.forEach(p=>{
+      const r=document.createElement('div'); r.className='np-row';
+      r.innerHTML=`<span class="g">${esc(p.name)}</span><span class="d">${p.models!=null?p.models+' modelo'+(p.models==1?'':'s'):esc(p.role||'')}</span>`;
+      r.onclick=()=>npElegirProyecto(p.share_id,r);
+      $('np-lista').appendChild(r);
+    });
+  }catch(e){
+    $('np-estado').innerHTML='<span style="color:var(--accent-2)">'+esc(e.message||e)+'</span>';
+    if(e.code==='hub/sin-sesion')$('np-conectar').style.display='';
+  }
+}
+$('btn-nuevo').onclick=()=>{
+  $('np-nombre').value=''; np.nombreAuto='';
+  $('np-modal').style.display='flex'; $('np-nombre').focus();
+  npCargar();
+};
+$('np-x').onclick=()=>$('np-modal').style.display='none';
+$('np-modal').onclick=e=>{ if(e.target.id==='np-modal') $('np-modal').style.display='none'; };
+$('np-conectar').onclick=async()=>{
+  try{ await HUB.connect(); npCargar(); }
+  catch(e){ $('np-estado').innerHTML='<span style="color:var(--accent-2)">'+esc(e.message||e)+'</span>'; }
+};
+$('np-salir').onclick=async()=>{ await HUB.disconnect(); npCargar(); };
+$('np-link-go').onclick=()=>{
+  const s=HUB.shareFromLink($('np-link').value);
+  if(!s){ $('np-estado').innerHTML='<span style="color:var(--accent-2)">Ese link no parece de un proyecto del BIM Hub.</span>'; return; }
+  npElegirProyecto(s,null);
+};
+$('np-vacio').onclick=()=>{
+  const nombre=$('np-nombre').value.trim();
+  if(!nombre){ $('np-nombre').focus(); return; }
+  crearProyecto(nombre,null);
+};
+$('np-crear-hub').onclick=()=>{
+  if(!np.proy||!np.modelo)return;
+  const nombre=$('np-nombre').value.trim()||np.proy.name;
+  const m=np.modelo;
+  crearProyecto(nombre,{share_id:np.proy.share_id,slug:np.proy.slug,projectName:np.proy.name,
+    model:{id:m.id,name:m.name,file_key:m.file_key,size:m.size||null,updated_at:m.updated_at||null},pending:true});
 };
 </script>
 </body>

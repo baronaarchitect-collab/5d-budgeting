@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>5D Budgeting · Presupuestación</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="firebase-config.js?v=7"></script>
-<script src="config.js?v=7"></script>
-<script src="auth.js?v=7"></script>
-<script src="saas.js?v=7"></script>
+<script src="firebase-config.js?v=8"></script>
+<script src="config.js?v=8"></script>
+<script src="auth.js?v=8"></script>
+<script src="saas.js?v=8"></script>
+<script src="hub.js?v=8"></script>
 <style>
   :root{
     --bg-0:#0a0d12;--bg-1:#11161e;--bg-2:#1a2230;--line:#2a3548;--text:#e6ecf5;--text-dim:#8b97aa;
@@ -210,6 +211,14 @@
         <input type="file" id="file-ifc" accept=".ifc" style="display:none">
         <label class="btn viol" for="file-lifecity"><span class="ic">⇪</span> JSON LifeCity (repo 50)</label>
         <input type="file" id="file-lifecity" accept=".json" style="display:none">
+      </div>
+      <div id="hub-box" style="display:none;margin:4px 0 10px;padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--viol);background:var(--bg-1)">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span id="hub-info" class="hint" style="flex:1;min-width:200px"></span>
+          <button class="btn sm" id="btn-hub-reload"><span class="ic">↻</span> Traer última versión</button>
+          <a class="btn sm" id="btn-hub-open" target="_blank" rel="noopener"><span class="ic">↗</span> Abrir en el visor</a>
+        </div>
+        <div id="hub-prog" style="display:none;height:4px;background:var(--bg-2);margin-top:8px"><div id="hub-bar" style="height:100%;width:0;background:var(--viol);transition:width .2s"></div></div>
       </div>
       <p class="hint">Sube el IFC del proyecto (Revit / masas.html) o el JSON exportado desde el editor LifeCity BIM 5D. La app extrae niveles, sótanos, áreas y cantidades por categoría; lo que no venga en el modelo se edita a mano abajo.</p>
       <div class="grid4" id="model-stats"></div>
@@ -1106,12 +1115,9 @@ function parsePsiActivities(ents){
  return Object.values(acts).sort((x,y)=>String(x.wbs).localeCompare(String(y.wbs),undefined,{numeric:true}));
 }
 
-$('file-ifc').onchange=e=>{
- const f=e.target.files[0]; if(!f)return;
- const r=new FileReader();
- r.onload=()=>{
+function procesarIfc(buf,fileName){
   try{
-   const buf=r.result;
+   const f={name:fileName};
    const text=new TextDecoder('utf-8').decode(buf);
    const d=parseIfcText(text);
    const sot=d.niveles.filter(n=>n.elev<-0.5).length;
@@ -1149,10 +1155,59 @@ $('file-ifc').onchange=e=>{
    bindAll();renderModel();autosave();
    flash(`IFC procesado: ${d.niveles.length} niveles (${sot} sótanos), ${Object.values(d.counts).reduce((a,b)=>a+b,0)} elementos${acts.length?`, ${acts.length} actividades PSI ✓`:''}`);
    loadIfcGeometry(buf); // visor con la geometría real (async)
-  }catch(err){flash('Error leyendo IFC: '+err.message);}
- };
+   return true;
+  }catch(err){flash('Error leyendo IFC: '+err.message);return false;}
+}
+$('file-ifc').onchange=e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>procesarIfc(r.result,f.name);
  r.readAsArrayBuffer(f); e.target.value='';
 };
+
+/* ---- Modelo publicado desde Revit al BIM Hub (Cloudflare) ---- */
+function renderHubBox(){
+ const h=P.hub, box=$('hub-box');
+ if(!h||!h.share_id||!h.model||!window.HUB){ box.style.display='none'; return; }
+ box.style.display='';
+ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ $('hub-info').innerHTML=`☁ BIM Hub · <b>${esc(h.projectName||h.slug||'')}</b> · modelo <b>${esc(h.model.name||h.model.id)}</b>`
+  +(h.importedAt?` · traído el ${new Date(h.importedAt).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'})}`:' · pendiente de descargar');
+ $('btn-hub-open').href=HUB.link(h.share_id);
+}
+let hubBusy=false;
+async function traerDelHub(){
+ const h=P.hub; if(!h||!h.model||hubBusy)return;
+ hubBusy=true;
+ const prog=$('hub-prog'), bar=$('hub-bar');
+ try{
+  await HUB.init();
+  if(!HUB.user){ flash('Conéctate al BIM Hub con tu cuenta de Google…',4000); await HUB.connect(); }
+  // versión publicada más reciente de ese modelo (la clave puede cambiar si se re-publica)
+  let m=h.model;
+  try{
+   const pr=await HUB.project(h.share_id);
+   const cur=(pr.models||[]).find(x=>x.id===h.model.id);
+   if(cur)m={id:cur.id,name:cur.name,file_key:cur.file_key,size:cur.size,updated_at:cur.updated_at};
+   h.projectName=pr.name||h.projectName;
+  }catch(e){ if(e.status===403||e.status===404)throw e; }
+  prog.style.display=''; bar.style.width='0';
+  flash('Descargando «'+(m.name||m.id)+'» del BIM Hub…',60000);
+  const buf=await HUB.download(h.share_id,m.file_key,(got,total)=>{
+   const t=total||m.size||0; if(t)bar.style.width=Math.min(100,Math.round(got/t*100))+'%';
+  });
+  const nombre=String(m.file_key).split('/').pop()||((m.id||'modelo')+'.ifc');
+  if(procesarIfc(buf,nombre)){
+   P.hub={...h,model:m,pending:false,importedAt:new Date().toISOString()};
+   renderHubBox(); autosave();
+  }
+ }catch(e){
+  flash('BIM Hub: '+String(e.message||e).slice(0,140),6000);
+ }finally{
+  hubBusy=false; prog.style.display='none';
+ }
+}
+$('btn-hub-reload').onclick=traerDelHub;
 
 /* ---- Visor: geometría IFC real vía web-ifc (WASM) ---- */
 let ifcGeomOK=false;
@@ -1215,7 +1270,7 @@ async function loadIfcGeometry(buf){
   }
   api.CloseModel(mid);
   if(!group.children.length)throw new Error('el IFC no trae geometría');
-  group.rotation.x=-Math.PI/2; // IFC Z-arriba → three Y-arriba
+  // Sin rotación (igual que el visor del BIM Hub): web-ifc ya entrega la geometría con Y hacia arriba.
   const wrap=new THREE.Group(); wrap.add(group);
   let bb=new THREE.Box3().setFromObject(wrap);
   const ctr=bb.getCenter(new THREE.Vector3());
@@ -3228,6 +3283,8 @@ renderMat();
 regenMail();
 renderProvMail();
 loadApuBase();
+renderHubBox();
+if(P.hub&&P.hub.pending)traerDelHub();
 const tabQ=QS.get('tab');
 if(tabQ){const b=document.querySelector(`.tabbtn[data-tab="${tabQ}"]`);if(b)b.click();}
 </script>
